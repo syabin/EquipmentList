@@ -179,6 +179,7 @@ body {
   position: relative;
 }
 .vs-spacer { visibility: hidden; pointer-events: none; }
+.end-hint { text-align: center; color: #94a3b8; font-size: 13px; padding: 12px 0; user-select: none; }
 
 table {
   width: 100%;
@@ -723,6 +724,8 @@ table.hide-nonessential .col-nameplate {
     </thead>
     <tbody id="tableBody" class="line-group-wrap"></tbody>
   </table>
+  <div class="end-hint">文档已经到底了</div>
+  <div style="height:190px"></div>
 </div>
 
 <div class="autocomplete" id="autocomplete"></div>
@@ -1243,8 +1246,9 @@ function render() {
   const viewH = wrapper ? wrapper.clientHeight : window.innerHeight;
   let scrollTop = wrapper ? wrapper.scrollTop : 0;
   // Clamp scroll to valid range (prevents blank area after filtering)
-  if (wrapper && total * ROW_HEIGHT > 0 && scrollTop > total * ROW_HEIGHT - viewH) {
-    wrapper.scrollTop = Math.max(0, total * ROW_HEIGHT - viewH);
+  // Allow scrolling 10 extra rows past the last data row
+  if (wrapper && total * ROW_HEIGHT > 0 && scrollTop > (total + 10) * ROW_HEIGHT - viewH) {
+    wrapper.scrollTop = Math.max(0, (total + 10) * ROW_HEIGHT - viewH);
     scrollTop = wrapper.scrollTop;
   }
   const BUFFER = 8;
@@ -1301,7 +1305,7 @@ function render() {
     html += '</tr>';
   }
 
-  html += `<tr class="vs-spacer" style="height:${Math.max(0, (total - endIdx) * ROW_HEIGHT)}px"></tr>`;
+  html += `<tr class="vs-spacer" style="height:${Math.max(0, (total - endIdx) * ROW_HEIGHT) + 4 * ROW_HEIGHT}px"></tr>`;
 
   tbody.innerHTML = html;
   updateInfo();
@@ -1393,8 +1397,6 @@ function addRow(data, skipHistory) {
   if (!skipHistory) pushHistory();
   rows.push(newRow(data));
   render();
-  const wrapper = document.querySelector('.table-wrapper');
-  setTimeout(() => wrapper.scrollTop = wrapper.scrollHeight, 50);
 }
 
 function deleteRow(id) {
