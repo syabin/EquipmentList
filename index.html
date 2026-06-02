@@ -2366,12 +2366,13 @@ document.getElementById('contractFile').addEventListener('change', function(e) {
       const colModel = findCol(['型号']);
       const colLine = findCol(['条线']);
       const colPos = findCol(['位置']);
+      const colDept = findCol(['责任部门']);
       const colContract = findCol(['合同号']);
 
       if (colModel < 0) { showToast('未找到「型号」列，请检查定单表表头'); e.target.value = ''; return; }
       if (colContract < 0) { showToast('未找到「合同号」列，请检查定单表表头'); e.target.value = ''; return; }
 
-      // Build contract pool: key = "model|line|position" → [contractNos]
+      // Build contract pool: key = "model|line|position|dept" → [contractNos]
       const pool = {};
       for (let i = 1; i < json.length; i++) {
         const r = json[i];
@@ -2379,9 +2380,10 @@ document.getElementById('contractFile').addEventListener('change', function(e) {
         const m = String(r[colModel] || '').trim();
         const l = colLine >= 0 ? String(r[colLine] || '').trim() : '';
         const p = colPos >= 0 ? String(r[colPos] || '').trim() : '';
+        const d = colDept >= 0 ? String(r[colDept] || '').trim() : '';
         const c = String(r[colContract] || '').trim();
         if (!m || !c || c === '0' || c === '-') continue;
-        const key = `${m}|${l}|${p}`;
+        const key = `${m}|${l}|${p}|${d}`;
         if (!pool[key]) pool[key] = [];
         pool[key].push(c);
       }
@@ -2393,7 +2395,7 @@ document.getElementById('contractFile').addEventListener('change', function(e) {
       let filled = 0;
       const usedContracts = new Set();
       rows.forEach(r => {
-        const key = `${r.model || ''}|${r.line || ''}|${r.position || ''}`;
+        const key = `${r.model || ''}|${r.line || ''}|${r.position || ''}|${r.dept || ''}`;
         const contracts = pool[key];
         if (!contracts || contracts.length === 0) return;
         // Take first unused contract
