@@ -1,13 +1,2528 @@
-<!doctype html>
-<html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>图片处理工具</title>
-    <script type="module" crossorigin src="./assets/index-DX93ldHF.js"></script>
-    <link rel="stylesheet" crossorigin href="./assets/index-BUvLicK8.css">
-  </head>
-  <body>
-    <div id="root"></div>
-  </body>
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>设备清单制作工具</title>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<style>
+:root {
+  --primary: #2563eb;
+  --primary-hover: #1d4ed8;
+  --danger: #dc2626;
+  --danger-hover: #b91c1c;
+  --success: #16a34a;
+  --warning: #f59e0b;
+  --bg: #f1f5f9;
+  --card: #ffffff;
+  --border: #e2e8f0;
+  --text: #1e293b;
+  --text-secondary: #64748b;
+  --row-hover: #f0f9ff;
+  --row-selected: #dbeafe;
+  --row-min-height: 36px;
+  --cell-padding-y: 6px;
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+body {
+  font-family: -apple-system, "Microsoft YaHei", "Segoe UI", sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  margin: 0;
+  overflow: hidden;
+  height: 100vh;
+}
+
+/* Header */
+.header {
+  background: var(--card);
+  border-bottom: 1px solid var(--border);
+  padding: 16px 24px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+}
+
+.header h1 {
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--text);
+}
+
+.header-actions {
+  display: flex;
+  gap: 4px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.header-sep {
+  width: 1px;
+  height: 24px;
+  background: var(--border);
+  margin: 0 6px;
+  flex-shrink: 0;
+}
+
+.header .btn {
+  padding: 6px 12px;
+  font-size: 12px;
+}
+
+.header .btn.btn-primary { padding: 7px 14px; font-size: 13px; }
+.header .btn.btn-danger { padding: 7px 14px; font-size: 13px; }
+.header .btn.btn-success { padding: 7px 14px; font-size: 13px; }
+
+/* Buttons */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 16px;
+  border: none;
+  border-radius: 6px;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s;
+  white-space: nowrap;
+}
+
+.btn-primary { background: var(--primary); color: #fff; }
+.btn-primary:hover { background: var(--primary-hover); }
+.btn-danger { background: var(--danger); color: #fff; }
+.btn-danger:hover { background: var(--danger-hover); }
+.btn-outline {
+  background: var(--card);
+  color: var(--text);
+  border: 1px solid var(--border);
+}
+.btn-outline:hover:not(:disabled) { background: var(--bg); }
+.btn-outline:disabled { opacity: 0.4; cursor: not-allowed; }
+.btn-success { background: var(--success); color: #fff; }
+.btn-success:hover { background: #15803d; }
+.btn-warning { background: var(--warning); color: #fff; }
+.btn-warning:hover { background: #d97706; }
+
+/* Info bar */
+.info-bar {
+  background: var(--card);
+  border-bottom: 1px solid var(--border);
+  padding: 10px 24px;
+  display: flex;
+  gap: 24px;
+  font-size: 13px;
+  color: var(--text-secondary);
+  align-items: center;
+}
+.info-bar span { font-weight: 500; color: var(--text); }
+
+.ref-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.ref-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #cbd5e1;
+  flex-shrink: 0;
+}
+.ref-dot.loaded { background: var(--success); }
+.ref-dot.cached { background: var(--warning); }
+
+/* Ref load banner */
+.ref-banner {
+  background: #fffbeb;
+  border: 1px solid #fde68a;
+  border-radius: 8px;
+  margin: 16px;
+  padding: 16px 20px;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+.ref-banner.hidden { display: none; }
+.ref-banner-icon {
+  font-size: 24px;
+  flex-shrink: 0;
+}
+.ref-banner-text {
+  flex: 1;
+}
+.ref-banner-text h3 {
+  font-size: 14px;
+  font-weight: 600;
+  color: #92400e;
+  margin-bottom: 4px;
+}
+.ref-banner-text p {
+  font-size: 12px;
+  color: #a16207;
+}
+
+/* Table container */
+.table-wrapper {
+  margin: 16px;
+  background: var(--card);
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  overflow: auto;
+  max-height: calc(100vh - 195px);
+  position: relative;
+}
+.vs-spacer { visibility: hidden; pointer-events: none; }
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+  min-width: 2200px;
+}
+
+thead th {
+  background: #f8fafc;
+  border-bottom: 2px solid var(--border);
+  border-right: 1px solid var(--border);
+  padding: 10px 8px;
+  text-align: left;
+  font-weight: 600;
+  color: var(--text);
+  white-space: nowrap;
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  font-size: 12px;
+}
+
+thead th:last-child { border-right: none; }
+
+tbody tr {
+  border-bottom: 1px solid var(--border);
+  transition: background 0.1s;
+}
+
+tbody tr:hover { background: var(--row-hover); }
+tbody tr.selected { background: var(--row-selected); }
+tbody tr.drag-over-top { border-top: 3px solid var(--primary) !important; }
+tbody tr.drag-over-bottom { border-bottom: 3px solid var(--primary) !important; }
+tbody tr.dragging { opacity: 0.4; }
+tbody tr.drag-copy { opacity: 0.4; }
+tbody tr.drag-over-top.drag-copy-mode { border-top: 3px solid var(--success) !important; }
+tbody tr.drag-over-bottom.drag-copy-mode { border-bottom: 3px solid var(--success) !important; }
+.drag-handle {
+  cursor: grab;
+  color: #94a3b8;
+  font-size: 14px;
+  user-select: none;
+  padding: 0 4px;
+  line-height: var(--row-min-height);
+}
+
+/* Line group borders — left accent on first cell */
+tbody tr.line-group-0 td:first-child { border-left: 9px solid #dc2626 !important; }
+tbody tr.line-group-1 td:first-child { border-left: 9px solid #ca8a04 !important; }
+tbody tr.line-group-2 td:first-child { border-left: 9px solid #16a34a !important; }
+tbody tr.line-group-3 td:first-child { border-left: 9px solid #2563eb !important; }
+tbody tr.line-group-4 td:first-child { border-left: 9px solid #9333ea !important; }
+tbody tr.line-group-5 td:first-child { border-left: 9px solid #1f2937 !important; }
+.drag-handle:hover { color: var(--text); }
+.drag-handle:active { cursor: grabbing; }
+
+tbody td {
+  padding: 0;
+  border-right: 1px solid #f1f5f9;
+  position: relative;
+}
+
+tbody td:last-child { border-right: none; }
+
+/* Cell input */
+.cell-input {
+  width: 100%;
+  height: 100%;
+  min-height: var(--row-min-height);
+  padding: var(--cell-padding-y) 8px;
+  border: none;
+  outline: none;
+  background: transparent;
+  font-size: 13px;
+  font-family: inherit;
+  color: var(--text);
+}
+
+.cell-input:focus {
+  background: #eff6ff;
+  box-shadow: inset 0 0 0 2px var(--primary);
+}
+
+.cell-input::placeholder { color: #cbd5e1; }
+.cell-input.number { text-align: center; }
+
+/* Select cell */
+.cell-select {
+  width: 100%;
+  height: 100%;
+  min-height: var(--row-min-height);
+  padding: var(--cell-padding-y) 8px;
+  border: none;
+  outline: none;
+  background: transparent;
+  font-size: 13px;
+  font-family: inherit;
+  color: var(--text);
+  cursor: pointer;
+  appearance: none;
+  -webkit-appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%2394a3b8'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 6px center;
+  padding-right: 20px;
+}
+
+.cell-select:focus {
+  background-color: #eff6ff;
+  box-shadow: inset 0 0 0 2px var(--primary);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%232563eb'/%3E%3C/svg%3E");
+}
+
+/* Row number */
+.row-num {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  min-height: 36px;
+  font-size: 12px;
+  color: var(--text-secondary);
+  font-weight: 500;
+  padding: 6px 8px;
+  user-select: none;
+}
+
+/* Checkbox cell */
+.check-cell {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  min-height: 36px;
+}
+
+.check-cell input[type="checkbox"] {
+  width: 16px;
+  height: 16px;
+  cursor: pointer;
+  accent-color: var(--primary);
+}
+
+/* Model search */
+.model-input-wrap { position: relative; }
+.model-input-wrap .cell-input { padding-right: 24px; cursor: pointer; }
+.model-input-wrap::after {
+  content: '';
+  position: absolute;
+  right: 8px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 0; height: 0;
+  border-left: 4px solid transparent;
+  border-right: 4px solid transparent;
+  border-top: 4px solid #94a3b8;
+  pointer-events: none;
+}
+
+/* Autocomplete dropdown */
+.autocomplete {
+  position: fixed;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.12);
+  max-height: 240px;
+  overflow-y: auto;
+  z-index: 1000;
+  display: none;
+  width: 340px;
+}
+.autocomplete.show { display: block; }
+.ac-item {
+  padding: 8px 12px;
+  cursor: pointer;
+  font-size: 13px;
+  border-bottom: 1px solid #f1f5f9;
+}
+.ac-item:last-child { border-bottom: none; }
+.ac-item:hover, .ac-item.active { background: #eff6ff; }
+.ac-item .ac-model { font-weight: 600; color: var(--text); }
+.ac-item .ac-name { color: var(--text-secondary); font-size: 12px; margin-left: 8px; }
+.ac-item .ac-attr { color: #94a3b8; font-size: 11px; margin-left: 6px; }
+
+/* Toast */
+.toast {
+  position: fixed;
+  bottom: 24px;
+  right: 24px;
+  background: #1e293b;
+  color: #fff;
+  padding: 12px 20px;
+  border-radius: 8px;
+  font-size: 13px;
+  z-index: 9999;
+  opacity: 0;
+  transform: translateY(10px);
+  transition: all 0.3s;
+  pointer-events: none;
+}
+.toast.show { opacity: 1; transform: translateY(0); }
+
+/* Column widths */
+.col-seq { width: 50px; min-width: 50px; }
+.col-check { width: 36px; min-width: 36px; }
+.col-year { width: 70px; min-width: 70px; }
+.col-project { width: 90px; min-width: 90px; }
+.col-vcode { width: 80px; min-width: 80px; }
+.col-contract { width: 130px; min-width: 130px; }
+.col-name { width: 180px; min-width: 180px; }
+.col-model { width: 140px; min-width: 140px; }
+.col-submodel { width: 140px; min-width: 140px; }
+.col-attr { width: 130px; min-width: 130px; }
+.col-block { width: 100px; min-width: 100px; }
+.col-process { width: 70px; min-width: 70px; }
+.col-note { width: 130px; min-width: 130px; }
+.col-qty { width: 60px; min-width: 60px; }
+.col-purchase { width: 110px; min-width: 110px; }
+.col-pos { width: 90px; min-width: 90px; }
+.col-contract-attr { width: 90px; min-width: 90px; }
+.col-biz { width: 80px; min-width: 80px; }
+.col-dept { width: 80px; min-width: 80px; }
+.col-paint { width: 100px; min-width: 100px; }
+.col-nameplate { width: 90px; min-width: 90px; }
+.col-line { width: 60px; min-width: 60px; }
+.col-special { width: 90px; min-width: 90px; }
+.col-del { width: 36px; min-width: 36px; }
+
+/* Non-essential column hide toggle */
+table.hide-nonessential { width: auto !important; min-width: 0 !important; }
+table.hide-nonessential .col-year,
+table.hide-nonessential .col-project,
+table.hide-nonessential .col-vcode,
+table.hide-nonessential .col-contract,
+table.hide-nonessential .col-note,
+table.hide-nonessential .col-contract-attr,
+table.hide-nonessential .col-biz,
+table.hide-nonessential .col-paint,
+table.hide-nonessential .col-nameplate {
+  width: 0 !important;
+  min-width: 0 !important;
+  max-width: 0 !important;
+  padding: 0 !important;
+  border: none !important;
+  overflow: hidden;
+  white-space: nowrap;
+}
+
+/* Scrollbar */
+::-webkit-scrollbar { width: 8px; height: 8px; }
+::-webkit-scrollbar-track { background: #f1f5f9; }
+::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+
+/* Modal */
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.4);
+  z-index: 200;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  display: none;
+}
+.modal-overlay.show { display: flex; }
+.modal {
+  background: var(--card);
+  border-radius: 12px;
+  padding: 24px;
+  width: 400px;
+  box-shadow: 0 20px 60px rgba(0,0,0,0.2);
+}
+.modal h3 { font-size: 16px; margin-bottom: 16px; }
+.modal-actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 20px; }
+
+/* Context menu */
+.ctx-menu {
+  position: fixed;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.15);
+  z-index: 500;
+  display: none;
+  min-width: 180px;
+  padding: 4px 0;
+  font-size: 13px;
+}
+.ctx-menu.show { display: block; }
+.ctx-item {
+  padding: 8px 16px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--text);
+  transition: background 0.1s;
+}
+.ctx-item:hover { background: #f1f5f9; }
+.ctx-item.disabled {
+  color: #cbd5e1;
+  pointer-events: none;
+}
+.ctx-item .ctx-shortcut {
+  margin-left: auto;
+  font-size: 11px;
+  color: #94a3b8;
+}
+
+/* Special mark popover */
+.smark-wrap { position: relative; display: inline-block; }
+.smark-panel {
+  display: none;
+  position: absolute;
+  top: 100%;
+  right: 0;
+  margin-top: 4px;
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  box-shadow: 0 4px 20px rgba(0,0,0,0.12);
+  z-index: 50;
+  padding: 10px 0;
+  min-width: 180px;
+}
+.smark-panel.show { display: block; }
+.smark-option {
+  display: flex;
+  align-items: center;
+  padding: 6px 14px;
+  cursor: pointer;
+  font-size: 13px;
+  color: var(--text);
+  gap: 8px;
+  transition: background 0.1s;
+}
+.smark-option:hover { background: var(--row-hover); }
+.smark-option input[type="radio"] { margin: 0; cursor: pointer; }
+.smark-option label { cursor: pointer; user-select: none; flex: 1; }
+.smark-panel .smark-apply {
+  margin: 6px 14px 0;
+  padding: 6px 0;
+  background: var(--primary);
+  color: #fff;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 13px;
+  text-align: center;
+  width: calc(100% - 28px);
+}
+.smark-panel .smark-apply:hover { opacity: 0.9; }
+
+/* Filter bar */
+.filter-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 16px;
+  background: #f8fafc;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  margin-bottom: 8px;
+}
+.filter-bar input {
+  flex: 1;
+  border: none;
+  outline: none;
+  background: transparent;
+  font-size: 13px;
+  color: var(--text);
+}
+.filter-bar input::placeholder { color: #94a3b8; }
+.filter-bar .filter-count {
+  font-size: 12px;
+  color: #64748b;
+  white-space: nowrap;
+}
+.filter-bar .filter-clear {
+  font-size: 12px;
+  color: var(--primary);
+  cursor: pointer;
+  border: none;
+  background: none;
+  white-space: nowrap;
+}
+.filter-bar .filter-clear:hover { text-decoration: underline; }
+.filter-bar .filter-field {
+  border: 1px solid #d1d5db;
+  border-radius: 4px;
+  padding: 4px 6px;
+  font-size: 12px;
+  color: var(--text);
+  background: #fff;
+  cursor: pointer;
+  outline: none;
+  min-width: 90px;
+}
+.ctx-sep {
+  height: 1px;
+  background: var(--border);
+  margin: 4px 0;
+}
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1>设备清单制作工具</h1>
+  <div class="header-actions">
+    <!-- Edit -->
+    <button class="btn btn-outline" id="undoBtn" onclick="undo()" disabled title="撤销 Ctrl+Z">↩</button>
+    <button class="btn btn-outline" id="redoBtn" onclick="redo()" disabled title="重做 Ctrl+Y">↪</button>
+    <div class="header-sep"></div>
+    <!-- View -->
+    <select id="rowDensity" class="btn btn-outline" style="font-size:11px;padding:4px 6px;cursor:pointer" title="行间距">
+      <option value="compact">紧凑</option>
+      <option value="default" selected>默认</option>
+      <option value="loose">宽松</option>
+    </select>
+    <button class="btn btn-outline" id="toggleNonEssential" onclick="toggleNonEssential()" title="隐藏/显示非关键列">精简</button>
+    <div class="smark-wrap">
+      <button class="btn btn-outline" id="smarkBtn" title="一键填充特殊标记">标记</button>
+      <div class="smark-panel" id="smarkPanel"></div>
+    </div>
+    <div class="header-sep"></div>
+    <!-- Data import -->
+    <label class="btn btn-warning" title="加载/刷新成品型号对照表（xlsx）">
+      对照表
+      <input type="file" id="refFileInput" accept=".xlsx,.xls" style="display:none">
+    </label>
+    <label class="btn btn-outline" title="从RICH定单表填充合同号">
+      填合同号
+      <input type="file" id="contractFile" accept=".xlsx,.xls,.csv" style="display:none">
+    </label>
+    <button class="btn btn-outline" onclick="clearContracts()" title="清空所有合同号">清合同号</button>
+    <label class="btn btn-outline" title="导入已有设备清单">
+      导入
+      <input type="file" id="importFile" accept=".xlsx,.xls" style="display:none">
+    </label>
+    <div class="header-sep"></div>
+    <!-- Row ops -->
+    <button class="btn btn-primary" onclick="addRow()">+ 添加行</button>
+    <button class="btn btn-danger" onclick="deleteSelected()">删除选中</button>
+    <div class="header-sep"></div>
+    <!-- File output -->
+    <span id="autosaveTime" style="color:#94a3b8;font-size:10px;flex-shrink:0"></span>
+    <button class="btn btn-success" onclick="saveExcel()">保存</button>
+    <button class="btn btn-outline" onclick="exportExcel()">导出</button>
+  </div>
+</div>
+
+<div class="info-bar">
+  <span>
+    共 <span id="totalRows">0</span> 条记录 &nbsp;|&nbsp;
+    已选 <span id="selectedCount">0</span> 条 &nbsp;|&nbsp;
+    <span class="ref-status">
+      <span class="ref-dot" id="refDot"></span>
+      型号对照表: <span id="modelCount">0</span> 个型号
+      <span id="refTime" style="color:#94a3b8;font-size:11px"></span>
+    </span>
+  </span>
+  <span style="display:flex;align-items:center;gap:6px;margin-left:auto">
+    <span style="color:#64748b;font-size:11px">工时:</span>
+    <span id="timerDisplay" style="font-weight:600;font-size:13px;color:#1e40af;min-width:80px">0秒</span>
+    <button class="btn btn-outline" id="timerToggleBtn" style="font-size:11px;padding:2px 8px">▶ 开始</button>
+    <button class="btn btn-outline" id="timerResetBtn" style="font-size:11px;padding:2px 6px" title="重置计时">↺</button>
+  </span>
+</div>
+
+<div class="ref-banner" id="refBanner">
+  <div class="ref-banner-icon">📋</div>
+  <div class="ref-banner-text">
+    <h3>请加载成品型号对照表</h3>
+    <p>点击顶部「对照表」按钮，选择「成品型号对照表.xlsx」文件，即可启用型号智能搜索和自动填充功能。</p>
+  </div>
+</div>
+
+<div class="filter-bar">
+  <span style="font-size:13px;color:#64748b">🔍</span>
+  <select id="filterField" class="filter-field" title="选择筛选字段">
+    <option value="">全部字段</option>
+    <option value="equipName">设备名称</option>
+    <option value="model">型号</option>
+    <option value="subModel">补充型号</option>
+    <option value="attr">属性</option>
+    <option value="blockOwner">撬块归属</option>
+    <option value="process">工序</option>
+    <option value="designNote">设计备注</option>
+    <option value="position">位置</option>
+    <option value="contractAttr">合同属性</option>
+    <option value="biz">业务归属</option>
+    <option value="dept">责任部门</option>
+    <option value="paint">油漆</option>
+    <option value="nameplate">铭牌</option>
+    <option value="specialMark">特殊标记</option>
+    <option value="projectNo">项目号</option>
+    <option value="virtualCode">虚拟码</option>
+    <option value="contractNo">合同号</option>
+    <option value="year">年份</option>
+    <option value="qty">数量</option>
+    <option value="line">条线</option>
+  </select>
+  <input type="text" id="filterInput" placeholder="输入关键词筛选…" autocomplete="off">
+  <span class="filter-count" id="filterCount"></span>
+  <button class="filter-clear" id="filterClear" style="display:none" onclick="clearFilter()">清除</button>
+</div>
+
+<div class="table-wrapper">
+  <table>
+    <thead>
+      <tr>
+        <th class="col-check"><input type="checkbox" id="checkAll" title="全选/取消全选"></th>
+        <th class="col-drag" style="width:32px;min-width:32px"></th>
+        <th class="col-seq">序号</th>
+        <th class="col-year">年份</th>
+        <th class="col-project">项目号</th>
+        <th class="col-vcode">虚拟码</th>
+        <th class="col-contract">合同号</th>
+        <th class="col-name">设备名称</th>
+        <th class="col-model">型号</th>
+        <th class="col-submodel">补充型号</th>
+        <th class="col-attr">属性</th>
+        <th class="col-block">撬块归属</th>
+        <th class="col-process">工序</th>
+        <th class="col-note">设计备注</th>
+        <th class="col-qty">数量</th>
+        <th class="col-purchase">是否整机外购</th>
+        <th class="col-pos">位置</th>
+        <th class="col-contract-attr">合同属性</th>
+        <th class="col-biz">业务归属</th>
+        <th class="col-dept">责任部门</th>
+        <th class="col-paint">油漆</th>
+        <th class="col-nameplate">铭牌</th>
+        <th class="col-line">条线</th>
+        <th class="col-special">特殊标记</th>
+        <th class="col-del"></th>
+      </tr>
+    </thead>
+    <tbody id="tableBody" class="line-group-wrap"></tbody>
+  </table>
+</div>
+
+<div class="autocomplete" id="autocomplete"></div>
+<div class="toast" id="toast"></div>
+<div class="ctx-menu" id="ctxMenu">
+  <div class="ctx-item" onclick="ctxInsertAbove()">
+    <span>&#x2191;</span> 在上方插入空行
+  </div>
+  <div class="ctx-item" onclick="ctxInsertBelow()">
+    <span>&#x2193;</span> 在下方插入空行
+  </div>
+  <div class="ctx-sep"></div>
+  <div class="ctx-item" onclick="ctxCopyRow()">
+    <span>&#x1F4CB;</span> 复制此行 <span class="ctx-shortcut">Ctrl+C</span>
+  </div>
+  <div class="ctx-item" onclick="ctxCopyRows()">
+    <span>&#x1F4CB;</span> 复制选中行
+  </div>
+  <div class="ctx-item disabled" id="ctxPasteItem" onclick="ctxPaste()">
+    <span>&#x1F4CC;</span> 粘贴 <span class="ctx-shortcut">Ctrl+V</span>
+  </div>
+  <div class="ctx-sep"></div>
+  <div class="ctx-item" onclick="ctxClearRow()">
+    <span>&#x2715;</span> 清空此行内容
+  </div>
+</div>
+
+<div class="modal-overlay" id="modalOverlay">
+  <div class="modal">
+    <h3 id="modalTitle">确认删除</h3>
+    <p id="modalMsg">确定要删除选中的记录吗？此操作不可撤销。</p>
+    <div class="modal-actions">
+      <button class="btn btn-outline" onclick="closeModal()">取消</button>
+      <button class="btn btn-danger" id="modalConfirm">确定</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ========== Data ==========
+let modelRef = [];
+let rows = [];
+let nextId = 1;
+let lastClickedRowId = null;
+let renderVersion = 0;
+let filterText = '';
+const ROW_HEIGHT = 38;
+
+const ATTRS = ["3D-UT管道","3D-支架","3D-液体管道","3D-粉体管道","DCR","EE-桥架","EE-电控系统","EE-线缆","LSU-UT元件","LSU-外购","LSU-工程外包","LSU-液体元件","LSU-粉体元件","LSU-缺失","ME-制胶机","ME-外购","ME-搅拌机","PSU-外购","PSU-撬块","PSU-液体单机","PSU-粉体单机","PSU-钢结构","SE-上位机"];
+const DEPTS = ["EC-单机","EE","LSU","ME","PSU","SE","3D"];
+const BIZS = ["RICH","ROSS"];
+const PAINTS = ["外表不锈钢","其他"];
+const NAMEPLATES = ["客户指定","标准铭牌","标准无LOGO"];
+const PURCHASES = ["否","是"];
+const CONTRACT_ATTRS = ["RICH"];
+
+const REF_CACHE_KEY = 'deviceList_refData';
+const REF_CACHE_TIME_KEY = 'deviceList_refTime';
+
+// ========== Undo/Redo ==========
+const MAX_HISTORY = 50;
+let undoStack = [];
+let redoStack = [];
+
+function snapshot() {
+  return JSON.stringify({ rows: rows, nextId: nextId, timerElapsed: getTimerTotal() });
+}
+
+function pushHistory() {
+  undoStack.push(snapshot());
+  if (undoStack.length > MAX_HISTORY) undoStack.shift();
+  redoStack = []; // new action clears redo
+  updateUndoUI();
+}
+
+function undo() {
+  if (undoStack.length === 0) return;
+  redoStack.push(snapshot());
+  const state = JSON.parse(undoStack.pop());
+  rows = state.rows;
+  nextId = state.nextId;
+  render();
+  updateUndoUI();
+  showToast('已撤销');
+}
+
+function redo() {
+  if (redoStack.length === 0) return;
+  undoStack.push(snapshot());
+  const state = JSON.parse(redoStack.pop());
+  rows = state.rows;
+  nextId = state.nextId;
+  render();
+  updateUndoUI();
+  showToast('已重做');
+}
+
+function updateUndoUI() {
+  const undoBtn = document.getElementById('undoBtn');
+  const redoBtn = document.getElementById('redoBtn');
+  if (undoBtn) {
+    undoBtn.disabled = undoStack.length === 0;
+    undoBtn.title = `撤销 (Ctrl+Z) — 剩余 ${undoStack.length} 步`;
+  }
+  if (redoBtn) {
+    redoBtn.disabled = redoStack.length === 0;
+    redoBtn.title = `重做 (Ctrl+Y) — 剩余 ${redoStack.length} 步`;
+  }
+}
+
+// ========== Auto-save ==========
+let autosaveTimer = null;
+
+const AUTOSAVE_KEY = 'deviceList_autosave';
+const AUTOSAVE_TIME_KEY = 'deviceList_autosaveTime';
+const TIMER_KEY = 'deviceList_timer';
+
+function autoSave() {
+  try {
+    const data = snapshot();
+    localStorage.setItem(AUTOSAVE_KEY, data);
+    localStorage.setItem(AUTOSAVE_TIME_KEY, new Date().toISOString());
+    // Also save timer state
+    saveTimerState();
+    const el = document.getElementById('autosaveTime');
+    if (el) el.textContent = '已暂存 ' + new Date().toLocaleTimeString('zh-CN');
+  } catch(e) {
+    console.warn('自动暂存失败:', e);
+  }
+}
+
+function startAutoSave() {
+  // Save every 15 seconds
+  autosaveTimer = setInterval(autoSave, 15000);
+  // Save on page unload
+  window.addEventListener('beforeunload', autoSave);
+}
+
+// ========== Timer ==========
+let timerElapsed = 0;      // Total elapsed seconds (cumulative)
+let timerRunning = false;
+let timerStartTime = null;  // timestamp when current run started
+let timerInterval = null;
+
+function formatTime(totalSec) {
+  const h = Math.floor(totalSec / 3600);
+  const m = Math.floor((totalSec % 3600) / 60);
+  const s = totalSec % 60;
+  if (h > 0) return `${h}时${String(m).padStart(2,'0')}分${String(s).padStart(2,'0')}秒`;
+  if (m > 0) return `${m}分${String(s).padStart(2,'0')}秒`;
+  return `${s}秒`;
+}
+
+function getTimerTotal() {
+  let total = timerElapsed;
+  if (timerRunning && timerStartTime) {
+    total += Math.floor((Date.now() - timerStartTime) / 1000);
+  }
+  return total;
+}
+
+function updateTimerDisplay() {
+  const el = document.getElementById('timerDisplay');
+  if (!el) return;
+  const total = getTimerTotal();
+  el.textContent = formatTime(total);
+  el.title = `累计工时: ${total} 秒`;
+}
+
+function timerTick() {
+  updateTimerDisplay();
+}
+
+function timerStart() {
+  if (timerRunning) return;
+  timerRunning = true;
+  timerStartTime = Date.now();
+  timerInterval = setInterval(timerTick, 1000);
+  updateTimerBtn();
+  updateTimerDisplay();
+}
+
+function timerPause() {
+  if (!timerRunning) return;
+  timerElapsed += Math.floor((Date.now() - timerStartTime) / 1000);
+  timerRunning = false;
+  timerStartTime = null;
+  if (timerInterval) { clearInterval(timerInterval); timerInterval = null; }
+  updateTimerBtn();
+  updateTimerDisplay();
+}
+
+function timerToggle() {
+  if (timerRunning) timerPause(); else timerStart();
+}
+
+function timerReset() {
+  showModal('重置计时', '确定要清零计时器吗？此操作不可撤销。', () => {
+    timerPause();
+    timerElapsed = 0;
+    updateTimerDisplay();
+    showToast('计时已重置');
+  }, null, '确认重置');
+}
+
+function updateTimerBtn() {
+  const btn = document.getElementById('timerToggleBtn');
+  if (!btn) return;
+  btn.textContent = timerRunning ? '⏸ 暂停' : '▶ 开始';
+  btn.className = timerRunning ? 'btn btn-warning' : 'btn btn-outline';
+}
+
+function saveTimerState() {
+  try {
+    const total = getTimerTotal();
+    localStorage.setItem(TIMER_KEY, JSON.stringify({
+      elapsed: timerRunning ? timerElapsed + Math.floor((Date.now() - timerStartTime) / 1000) : timerElapsed,
+      running: timerRunning,
+      lastTick: Date.now()
+    }));
+  } catch(e) {}
+}
+
+function loadTimerState() {
+  try {
+    const raw = localStorage.getItem(TIMER_KEY);
+    if (!raw) return;
+    const state = JSON.parse(raw);
+    if (state.elapsed > 0) {
+      timerElapsed = state.elapsed;
+    }
+    // If was running, calculate drift since last save
+    if (state.running && state.lastTick) {
+      const drift = Math.floor((Date.now() - state.lastTick) / 1000);
+      // Only resume if drift < 2 hours (avoid phantom timer after long absence)
+      if (drift < 7200) {
+        timerRunning = true;
+        timerStartTime = Date.now();
+        timerInterval = setInterval(timerTick, 1000);
+      } else {
+        // Too much drift, just add the saved elapsed
+        timerElapsed = state.elapsed;
+        timerRunning = false;
+      }
+    }
+    updateTimerBtn();
+    updateTimerDisplay();
+  } catch(e) {}
+}
+
+function initTimer() {
+  loadTimerState();
+  document.getElementById('timerToggleBtn').addEventListener('click', timerToggle);
+  document.getElementById('timerResetBtn').addEventListener('click', timerReset);
+}
+
+// ========== Row density ==========
+const DENSITY_KEY = 'deviceList_density';
+const DENSITY_MAP = {
+  compact:  { minHeight: '28px', padding: '2px' },
+  default:  { minHeight: '36px', padding: '6px' },
+  loose:    { minHeight: '48px', padding: '10px' }
+};
+function setDensity(key) {
+  const d = DENSITY_MAP[key];
+  if (!d) return;
+  document.documentElement.style.setProperty('--row-min-height', d.minHeight);
+  document.documentElement.style.setProperty('--cell-padding-y', d.padding);
+  try { localStorage.setItem(DENSITY_KEY, key); } catch(e) {}
+}
+function initDensity() {
+  const saved = localStorage.getItem(DENSITY_KEY) || 'default';
+  const sel = document.getElementById('rowDensity');
+  if (sel) sel.value = saved;
+  setDensity(saved);
+}
+
+// ========== Toggle non-essential columns ==========
+const NONESSENTIAL_KEY = 'deviceList_nonessential';
+
+function toggleNonEssential() {
+  const table = document.querySelector('.table-wrapper table');
+  const btn = document.getElementById('toggleNonEssential');
+  const hidden = table.classList.toggle('hide-nonessential');
+  btn.textContent = hidden ? '展开' : '精简';
+  btn.className = 'btn ' + (hidden ? 'btn-outline' : 'btn-outline');
+  try { localStorage.setItem(NONESSENTIAL_KEY, hidden ? '1' : '0'); } catch(e) {}
+}
+
+function initNonEssential() {
+  const saved = localStorage.getItem(NONESSENTIAL_KEY);
+  if (saved === '1') {
+    const table = document.querySelector('.table-wrapper table');
+    table.classList.add('hide-nonessential');
+    const btn = document.getElementById('toggleNonEssential');
+    btn.textContent = '展开';
+  }
+}
+
+// ========== Special mark fill ==========
+const SMARK_OPTS = ['普通', '出口', '医药', '防爆', '有毒', '精细化工', '出口精细化工'];
+
+function buildSmarkPanel() {
+  const panel = document.getElementById('smarkPanel');
+  let html = '';
+  SMARK_OPTS.forEach(opt => {
+    html += `<div class="smark-option">
+      <input type="radio" name="smark" value="${opt}" id="smark_${opt}">
+      <label for="smark_${opt}">${opt}</label>
+    </div>`;
+  });
+  html += '<button class="smark-apply" onclick="applySmark()">应用</button>';
+  panel.innerHTML = html;
+}
+
+function applySmark() {
+  const checked = document.querySelector('input[name="smark"]:checked');
+  if (!checked) { showToast('请先选择一个标记选项'); return; }
+  const val = checked.value;
+  const isNormal = val === '普通';
+
+  pushHistory();
+  rows.forEach(r => {
+    // Build special mark: selected option (unless 普通) + suffix
+    const parts = [];
+    if (!isNormal) parts.push(val);
+    if (r.model) {
+      const m = r.model.trim();
+      if (m.endsWith('-EE') || m.endsWith('-ee')) parts.push('电控硬件');
+      if (m.endsWith('-SE') || m.endsWith('-se')) parts.push('上位机');
+    }
+    r.specialMark = parts.join('');
+  });
+
+  render();
+  hideSmarkPanel();
+  showToast(`已填充: ${isNormal ? '电控硬件/上位机（型号后缀匹配）' : val + ' + 型号后缀匹配'}`);
+}
+
+function hideSmarkPanel() {
+  document.getElementById('smarkPanel').classList.remove('show');
+}
+
+// Toggle smark panel
+document.getElementById('smarkBtn').addEventListener('click', e => {
+  e.stopPropagation();
+  document.getElementById('smarkPanel').classList.toggle('show');
+});
+
+document.addEventListener('click', e => {
+  if (!e.target.closest('.smark-wrap')) {
+    document.getElementById('smarkPanel').classList.remove('show');
+  }
+});
+
+function checkAutoSave(onRestored, onSkipped) {
+  const saved = localStorage.getItem(AUTOSAVE_KEY);
+  const savedTime = localStorage.getItem(AUTOSAVE_TIME_KEY);
+  if (!saved) { onSkipped(); return; }
+  const state = JSON.parse(saved);
+  if (!state.rows || state.rows.length === 0) { onSkipped(); return; }
+  // Check if user has real data (not just default empty rows)
+  const hasRealData = state.rows.some(r =>
+    r.model || r.equipName || r.contractNo || r.virtualCode || r.projectNo
+  );
+  if (!hasRealData) { onSkipped(); return; }
+  const time = savedTime ? new Date(savedTime).toLocaleString('zh-CN') : '未知时间';
+  showModal('恢复暂存数据', `检测到上次暂存的 ${state.rows.length} 行数据（${time}），是否恢复？`, () => {
+    rows = state.rows;
+    nextId = state.nextId;
+    undoStack = [];
+    redoStack = [];
+    render();
+    showToast(`已恢复 ${state.rows.length} 行暂存数据`);
+    onRestored();
+  }, () => {
+    onSkipped();
+  }, '确认恢复');
+}
+
+// ========== Load reference data from xlsx ==========
+function loadRefFromFile(file) {
+  const reader = new FileReader();
+  reader.onload = function(ev) {
+    try {
+      const wb = XLSX.read(ev.target.result, { type: 'array' });
+      const sheetName = wb.SheetNames.find(n => n.includes('成品型号对照表')) || wb.SheetNames.find(n => n.includes('型号')) || wb.SheetNames[0];
+      const ws = wb.Sheets[sheetName];
+      const json = XLSX.utils.sheet_to_json(ws, { header: 1 });
+
+      if (json.length < 2) {
+        showToast('对照表文件内容为空');
+        return;
+      }
+
+      // Parse rows: skip header row (row 0)
+      // Expected columns: 序号(A), 型号(B), 设备名称(C), 属性(D), 责任部门(E), 业务归属(F)
+      modelRef = [];
+      for (let i = 1; i < json.length; i++) {
+        const row = json[i];
+        if (!row || !row[1]) continue; // Skip rows without model
+        if (row.every(c => c == null || c === '')) continue;
+        modelRef.push({
+          model: String(row[1] || '').trim(),
+          name: String(row[2] || '').trim(),
+          attr: String(row[3] || '').trim(),
+          dept: String(row[4] || '').trim(),
+          biz: String(row[5] || '').trim()
+        });
+      }
+
+      if (modelRef.length === 0) {
+        showToast('未从对照表中解析到任何型号数据');
+        return;
+      }
+
+      // Cache to localStorage
+      try {
+        localStorage.setItem(REF_CACHE_KEY, JSON.stringify(modelRef));
+        localStorage.setItem(REF_CACHE_TIME_KEY, new Date().toISOString());
+      } catch(e) {
+        console.warn('localStorage 缓存写入失败:', e);
+      }
+
+      updateRefStatus('loaded', file.name);
+      showToast(`已加载 ${modelRef.length} 个型号 (${file.name})`);
+    } catch(err) {
+      console.error(err);
+      showToast('解析对照表失败: ' + err.message);
+    }
+  };
+  reader.readAsArrayBuffer(file);
+}
+
+function loadRefFromCache() {
+  try {
+    const cached = localStorage.getItem(REF_CACHE_KEY);
+    const cachedTime = localStorage.getItem(REF_CACHE_TIME_KEY);
+    if (cached) {
+      modelRef = JSON.parse(cached);
+      document.getElementById('modelCount').textContent = modelRef.length;
+      const dot = document.getElementById('refDot');
+      dot.classList.add('cached');
+      dot.classList.remove('loaded');
+      const timeEl = document.getElementById('refTime');
+      if (cachedTime) {
+        const d = new Date(cachedTime);
+        timeEl.textContent = `(缓存: ${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')} ${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')})`;
+      }
+      document.getElementById('refBanner').classList.add('hidden');
+      return true;
+    }
+  } catch(e) {
+    console.warn('读取缓存失败:', e);
+  }
+  return false;
+}
+
+function updateRefStatus(type, fileName) {
+  document.getElementById('modelCount').textContent = modelRef.length;
+  const dot = document.getElementById('refDot');
+  dot.className = 'ref-dot ' + type;
+  const timeEl = document.getElementById('refTime');
+  if (type === 'loaded') {
+    const now = new Date();
+    timeEl.textContent = `(${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')} ${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')})`;
+    document.getElementById('refBanner').classList.add('hidden');
+  }
+}
+
+// Ref file input handler
+document.getElementById('refFileInput').addEventListener('change', function(e) {
+  const file = e.target.files[0];
+  if (!file) return;
+  loadRefFromFile(file);
+  e.target.value = ''; // Allow re-selecting same file
+});
+
+// ========== Toast ==========
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 2500);
+}
+
+// ========== Modal ==========
+function showModal(title, msg, onConfirm, onCancel, confirmText) {
+  document.getElementById('modalTitle').textContent = title;
+  document.getElementById('modalMsg').textContent = msg;
+  document.getElementById('modalConfirm').textContent = confirmText || '确定';
+  document.getElementById('modalOverlay').classList.add('show');
+  document.getElementById('modalConfirm').onclick = () => { closeModal(); onConfirm(); };
+  const cancelBtn = document.querySelector('.modal-actions .btn-outline');
+  if (cancelBtn && onCancel) {
+    cancelBtn.onclick = () => { closeModal(); onCancel(); };
+  }
+}
+function closeModal() {
+  document.getElementById('modalOverlay').classList.remove('show');
+}
+
+// ========== Render ==========
+function render() {
+  renderVersion++;
+  const tbody = document.getElementById('tableBody');
+  const currentYear = new Date().getFullYear();
+  const wrapper = document.querySelector('.table-wrapper');
+
+  let displayRows = rows;
+  const q = filterText.toLowerCase();
+  const f = document.getElementById('filterField') ? document.getElementById('filterField').value : '';
+  if (filterText) {
+    displayRows = rows.filter(r => matchFilter(r, f, q));
+  }
+
+  const total = displayRows.length;
+  const viewH = wrapper ? wrapper.clientHeight : window.innerHeight;
+  let scrollTop = wrapper ? wrapper.scrollTop : 0;
+  // Clamp scroll to valid range (prevents blank area after filtering)
+  if (wrapper && total * ROW_HEIGHT > 0 && scrollTop > total * ROW_HEIGHT - viewH) {
+    wrapper.scrollTop = Math.max(0, total * ROW_HEIGHT - viewH);
+    scrollTop = wrapper.scrollTop;
+  }
+  const BUFFER = 8;
+  const MIN_VISIBLE = 20;
+  const startIdx = Math.max(0, Math.floor(scrollTop / ROW_HEIGHT) - BUFFER);
+  let endIdx = Math.min(total, Math.ceil((scrollTop + viewH) / ROW_HEIGHT) + BUFFER);
+  // Ensure at least MIN_VISIBLE rows are rendered (fixes restore-after-modal issue)
+  if (endIdx - startIdx < MIN_VISIBLE && total >= MIN_VISIBLE) {
+    endIdx = Math.min(total, startIdx + MIN_VISIBLE);
+  }
+
+  const lineGroups = [];
+  for (let i = startIdx; i < endIdx && i < total; i++) {
+    if (displayRows[i].line) {
+      lineGroups.push(parseInt(displayRows[i].line));
+    } else {
+      lineGroups.push(-1);
+    }
+  }
+
+  let html = '';
+  html += `<tr class="vs-spacer" style="height:${startIdx * ROW_HEIGHT}px"></tr>`;
+
+  for (let i = startIdx; i < endIdx && i < total; i++) {
+    const r = displayRows[i];
+    const gi = lineGroups[i - startIdx];
+    const groupClass = gi >= 0 ? ` line-group-${((gi - 1) % 6 + 6) % 6}` : '';
+    html += `<tr data-id="${r.id}" data-idx="${i}" class="${r.selected ? 'selected' : ''}${groupClass}">`;
+    html += `<td class="check-cell"><input type="checkbox" ${r.selected ? 'checked' : ''} data-id="${r.id}"></td>`;
+    html += `<td class="col-drag"><div class="drag-handle" draggable="true" title="拖拽移动（Ctrl+拖拽=复制）">⠿</div></td>`;
+    html += `<td class="col-seq"><div class="row-num">${i + 1}</div></td>`;
+    html += `<td class="col-year"><input class="cell-input number" type="number" value="${r.year || currentYear}" data-field="year" data-id="${r.id}"></td>`;
+    html += `<td class="col-project"><input class="cell-input" value="${esc(r.projectNo)}" data-field="projectNo" data-id="${r.id}" placeholder="项目号"></td>`;
+    html += `<td class="col-vcode"><input class="cell-input" value="${esc(r.virtualCode)}" data-field="virtualCode" data-id="${r.id}" placeholder="虚拟码"></td>`;
+    html += `<td class="col-contract"><input class="cell-input" value="${esc(r.contractNo)}" data-field="contractNo" data-id="${r.id}" placeholder="合同号"></td>`;
+    html += `<td class="col-name"><input class="cell-input" value="${esc(r.equipName)}" data-field="equipName" data-id="${r.id}" placeholder="自动填充"></td>`;
+    html += `<td class="col-model"><div class="model-input-wrap"><input class="cell-input" value="${esc(r.model)}" data-field="model" data-id="${r.id}" placeholder="输入搜索型号..." autocomplete="off"></div></td>`;
+    html += `<td class="col-submodel"><input class="cell-input" value="${esc(r.subModel)}" data-field="subModel" data-id="${r.id}" placeholder="补充型号"></td>`;
+    html += `<td class="col-attr">${selectHtml('attr', r.id, r.attr, ATTRS)}</td>`;
+    html += `<td class="col-block"><input class="cell-input" value="${esc(r.blockOwner)}" data-field="blockOwner" data-id="${r.id}" placeholder="撬块归属"></td>`;
+    html += `<td class="col-process"><input class="cell-input" value="${esc(r.process)}" data-field="process" data-id="${r.id}" placeholder="工序"></td>`;
+    html += `<td class="col-note"><input class="cell-input" value="${esc(r.designNote)}" data-field="designNote" data-id="${r.id}" placeholder="设计备注"></td>`;
+    html += `<td class="col-qty"><input class="cell-input number" type="number" min="1" value="${r.qty || 1}" data-field="qty" data-id="${r.id}"></td>`;
+    html += `<td class="col-purchase">${selectHtml('purchase', r.id, r.purchase, PURCHASES)}</td>`;
+    html += `<td class="col-pos"><input class="cell-input" value="${esc(r.position)}" data-field="position" data-id="${r.id}" placeholder="位置"></td>`;
+    html += `<td class="col-contract-attr">${selectHtml('contractAttr', r.id, r.contractAttr, CONTRACT_ATTRS)}</td>`;
+    html += `<td class="col-biz">${selectHtml('biz', r.id, r.biz, BIZS)}</td>`;
+    html += `<td class="col-dept">${selectHtml('dept', r.id, r.dept, DEPTS)}</td>`;
+    html += `<td class="col-paint">${selectHtml('paint', r.id, r.paint, PAINTS)}</td>`;
+    html += `<td class="col-nameplate">${selectHtml('nameplate', r.id, r.nameplate, NAMEPLATES)}</td>`;
+    html += `<td class="col-line"><input class="cell-input number" type="number" min="1" value="${r.line || ''}" data-field="line" data-id="${r.id}" placeholder="条线"></td>`;
+    html += `<td class="col-special"><input class="cell-input" value="${esc(r.specialMark)}" data-field="specialMark" data-id="${r.id}" placeholder="特殊标记"></td>`;
+    html += `<td class="col-del"><button class="btn btn-danger" style="padding:4px 8px;font-size:11px" onclick="deleteRow(${r.id})" title="删除此行">&times;</button></td>`;
+    html += '</tr>';
+  }
+
+  html += `<tr class="vs-spacer" style="height:${Math.max(0, (total - endIdx) * ROW_HEIGHT)}px"></tr>`;
+
+  tbody.innerHTML = html;
+  updateInfo();
+  bindEvents();
+}
+
+function selectHtml(field, id, value, options) {
+  let html = `<select class="cell-select" data-field="${field}" data-id="${id}">`;
+  html += `<option value="">--</option>`;
+  options.forEach(opt => {
+    html += `<option value="${esc(opt)}" ${value === opt ? 'selected' : ''}>${esc(opt)}</option>`;
+  });
+  html += '</select>';
+  return html;
+}
+
+function esc(str) {
+  if (str == null) return '';
+  return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+function updateInfo() {
+  document.getElementById('totalRows').textContent = rows.length;
+  document.getElementById('selectedCount').textContent = rows.filter(r => r.selected).length;
+  const fc = document.getElementById('filterCount');
+  const fcb = document.getElementById('filterClear');
+  if (filterText) {
+    const q = filterText.toLowerCase();
+    const f = document.getElementById('filterField').value;
+    const visible = rows.filter(r => matchFilter(r, f, q)).length;
+    fc.textContent = `匹配 ${visible} / ${rows.length}`;
+    fcb.style.display = '';
+  } else {
+    fc.textContent = '';
+    fcb.style.display = 'none';
+  }
+}
+
+// Filter match helper: field-level or all-fields
+const FILTER_ALL_FIELDS = ['projectNo','virtualCode','contractNo','equipName','model','subModel','attr','blockOwner','process','designNote','position','contractAttr','biz','dept','paint','nameplate','specialMark','year','qty','line'];
+function matchFilter(r, field, q) {
+  if (!q) return true;
+  if (field) {
+    return String(r[field] || '').toLowerCase().includes(q);
+  }
+  for (const k of FILTER_ALL_FIELDS) {
+    if (String(r[k] || '').toLowerCase().includes(q)) return true;
+  }
+  return false;
+}
+
+// ========== Row operations ==========
+function newRow(data = {}) {
+  // Defaults from first row (if exists and has data)
+  const first = rows.length > 0 ? rows[0] : null;
+  const defYear = (data.year != null) ? data.year : (first && first.year ? first.year : new Date().getFullYear());
+  const defProjectNo = (data.projectNo != null && data.projectNo !== '') ? data.projectNo : (first && first.projectNo ? first.projectNo : '');
+  const defPaint = (data.paint != null && data.paint !== '') ? data.paint : (first && first.paint ? first.paint : '');
+  const defNameplate = (data.nameplate != null && data.nameplate !== '') ? data.nameplate : (first && first.nameplate ? first.nameplate : '');
+
+  return {
+    id: nextId++,
+    year: typeof defYear === 'number' ? defYear : parseInt(defYear) || new Date().getFullYear(),
+    projectNo: defProjectNo,
+    virtualCode: data.virtualCode || '',
+    contractNo: data.contractNo || '',
+    equipName: data.equipName || '',
+    model: data.model || '',
+    subModel: data.subModel || '',
+    attr: data.attr || '',
+    blockOwner: data.blockOwner || '',
+    process: data.process || '',
+    designNote: data.designNote || '',
+    qty: data.qty || 1,
+    purchase: data.purchase || '否',
+    position: data.position || '',
+    contractAttr: data.contractAttr || 'RICH',
+    biz: data.biz || 'RICH',
+    dept: data.dept || '',
+    paint: defPaint,
+    nameplate: defNameplate,
+    line: data.line || '',
+    specialMark: data.specialMark || '',
+    selected: false
+  };
+}
+
+function addRow(data, skipHistory) {
+  if (!skipHistory) pushHistory();
+  rows.push(newRow(data));
+  render();
+  const wrapper = document.querySelector('.table-wrapper');
+  setTimeout(() => wrapper.scrollTop = wrapper.scrollHeight, 50);
+}
+
+function deleteRow(id) {
+  pushHistory();
+  rows = rows.filter(r => r.id !== id);
+  render();
+}
+
+function toggleSelect(id, event) {
+  const row = rows.find(r => r.id === id);
+  if (!row) return;
+
+  const updatedIds = [];
+  if (event && event.shiftKey && lastClickedRowId != null && lastClickedRowId !== id) {
+    // Shift+click: range select between lastClickedRowId and current
+    const lastIdx = rows.findIndex(r => r.id === lastClickedRowId);
+    const curIdx = rows.findIndex(r => r.id === id);
+    if (lastIdx >= 0 && curIdx >= 0) {
+      const start = Math.min(lastIdx, curIdx);
+      const end = Math.max(lastIdx, curIdx);
+      for (let i = start; i <= end; i++) {
+        rows[i].selected = true;
+        updatedIds.push(rows[i].id);
+      }
+    }
+  } else {
+    row.selected = !row.selected;
+    updatedIds.push(id);
+    lastClickedRowId = id;
+  }
+
+  // Update visuals without full re-render
+  updatedIds.forEach(rid => {
+    const r = rows.find(r => r.id === rid);
+    const tr = document.querySelector(`tr[data-id="${rid}"]`);
+    if (tr && r) {
+      tr.classList.toggle('selected', r.selected);
+      const cb = tr.querySelector('input[type="checkbox"]');
+      if (cb) cb.checked = r.selected;
+    }
+  });
+
+  const allSelected = rows.length > 0 && rows.every(r => r.selected);
+  document.getElementById('checkAll').checked = allSelected;
+  updateInfo();
+}
+
+function trSelected(id) {
+  const tr = document.querySelector(`tr[data-id="${id}"]`);
+  if (tr) { tr.classList.add('selected'); const cb = tr.querySelector('input[type="checkbox"]'); if (cb) cb.checked = true; }
+}
+function trDeselected(id) {
+  const tr = document.querySelector(`tr[data-id="${id}"]`);
+  if (tr) { tr.classList.remove('selected'); const cb = tr.querySelector('input[type="checkbox"]'); if (cb) cb.checked = false; }
+}
+function updateCheckAll() {
+  document.getElementById('checkAll').checked = rows.length > 0 && rows.every(r => r.selected);
+}
+
+function deleteSelected() {
+  const count = rows.filter(r => r.selected).length;
+  if (count === 0) { showToast('请先勾选要删除的行'); return; }
+  showModal('确认删除', `确定要删除选中的 ${count} 条记录吗？`, () => {
+    pushHistory();
+    rows = rows.filter(r => !r.selected);
+    document.getElementById('checkAll').checked = false;
+    render();
+    showToast(`已删除 ${count} 条记录`);
+  });
+}
+
+// ========== Clipboard: fields for copy/paste ==========
+const CLIP_FIELDS = ['year','projectNo','virtualCode','contractNo','equipName','model','subModel','attr','blockOwner','process','designNote','qty','purchase','position','contractAttr','biz','dept','paint','nameplate','line','specialMark'];
+let clipboard = null; // {type:'rows'|'tsv', data: [...]}
+let lastFocusedRowId = null;
+let lastFocusedField = null;
+
+// Track which cell was last focused
+function bindEvents() {
+  document.querySelectorAll('.cell-input').forEach(input => {
+    const _rv = renderVersion;
+    input.addEventListener('change', e => {
+      if (_rv !== renderVersion) return;
+      const id = parseInt(e.target.dataset.id);
+      const field = e.target.dataset.field;
+      const row = rows.find(r => r.id === id);
+      if (!row) return;
+      let newVal;
+      if (field === 'qty' || field === 'line' || field === 'year') {
+        newVal = e.target.value ? parseInt(e.target.value) : '';
+      } else {
+        newVal = e.target.value;
+      }
+      // Skip if value unchanged
+      if (row[field] === newVal) return;
+      pushHistory();
+      row[field] = newVal;
+
+      // Batch fill: position, line, paint, nameplate apply to all selected rows
+      if ((field === 'position' || field === 'line' || field === 'paint' || field === 'nameplate') && row.selected) {
+        const selectedRows = rows.filter(r => r.selected && r.id !== id);
+        if (selectedRows.length > 0) {
+          selectedRows.forEach(r => { r[field] = newVal; });
+          selectedRows.forEach(r => {
+            const otherTr = document.querySelector(`tr[data-id="${r.id}"]`);
+            if (otherTr) {
+              const el = otherTr.querySelector(`[data-field="${field}"][data-id="${r.id}"]`);
+              if (el) el.value = newVal || '';
+            }
+          });
+          const labels = { position:'位置', line:'条线', paint:'油漆', nameplate:'铭牌' };
+          showToast(`已批量填写 ${labels[field]}（${selectedRows.length + 1} 行）`);
+        }
+      }
+    });
+    input.addEventListener('focus', e => {
+      lastFocusedRowId = parseInt(e.target.dataset.id);
+      lastFocusedField = e.target.dataset.field;
+    });
+  });
+
+  document.querySelectorAll('.cell-select').forEach(sel => {
+    const _rv = renderVersion;
+    sel.addEventListener('change', e => {
+      if (_rv !== renderVersion) return;
+      const id = parseInt(e.target.dataset.id);
+      const field = e.target.dataset.field;
+      const row = rows.find(r => r.id === id);
+      if (!row) return;
+      const newVal = e.target.value;
+      if (row[field] === newVal) return;
+      pushHistory();
+      row[field] = newVal;
+
+      // Batch fill for select fields too (paint, nameplate)
+      if ((field === 'paint' || field === 'nameplate') && row.selected) {
+        const selectedRows = rows.filter(r => r.selected && r.id !== id);
+        if (selectedRows.length > 0) {
+          selectedRows.forEach(r => { r[field] = newVal; });
+          selectedRows.forEach(r => {
+            const otherTr = document.querySelector(`tr[data-id="${r.id}"]`);
+            if (otherTr) {
+              const el = otherTr.querySelector(`[data-field="${field}"][data-id="${r.id}"]`);
+              if (el) el.value = newVal || '';
+            }
+          });
+          const labels = { paint:'油漆', nameplate:'铭牌' };
+          showToast(`已批量填写 ${labels[field]}（${selectedRows.length + 1} 行）`);
+        }
+      }
+    });
+    sel.addEventListener('focus', e => {
+      lastFocusedRowId = parseInt(e.target.dataset.id);
+      lastFocusedField = e.target.dataset.field;
+    });
+  });
+
+  document.querySelectorAll('.model-input-wrap .cell-input').forEach(input => {
+    input.addEventListener('focus', e => {
+      lastFocusedRowId = parseInt(e.target.dataset.id);
+      lastFocusedField = 'model';
+      e.target.select();
+      showAutocomplete(e.target);
+    });
+    input.addEventListener('input', e => {
+      showAutocomplete(e.target);
+    });
+    input.addEventListener('blur', e => {
+      setTimeout(() => hideAutocomplete(), 200);
+    });
+    input.addEventListener('keydown', e => {
+      handleAcKeydown(e);
+    });
+  });
+
+  document.getElementById('checkAll').onchange = e => {
+    rows.forEach(r => r.selected = e.target.checked);
+    if (e.target.checked) lastClickedRowId = null;
+    render();
+  };
+
+  // Click thead to deselect all
+  document.querySelector('thead').addEventListener('click', e => {
+    if (e.target.tagName !== 'INPUT' && rows.some(r => r.selected)) {
+      rows.forEach(r => r.selected = false);
+      document.getElementById('checkAll').checked = false;
+      render();
+    }
+  });
+
+  // Checkbox toggle (use mousedown+change for reliable behavior)
+  let _shiftHeld = false;
+  document.querySelectorAll('tbody tr input[type="checkbox"]').forEach(cb => {
+    cb.addEventListener('mousedown', e => {
+      _shiftHeld = e.shiftKey;
+    });
+    cb.addEventListener('change', e => {
+      const id = parseInt(e.target.dataset.id);
+      const checked = e.target.checked;
+
+      if (_shiftHeld && lastClickedRowId != null && lastClickedRowId !== id) {
+        // Shift+click range select
+        const lastIdx = rows.findIndex(r => r.id === lastClickedRowId);
+        const curIdx = rows.findIndex(r => r.id === id);
+        if (lastIdx >= 0 && curIdx >= 0) {
+          const start = Math.min(lastIdx, curIdx);
+          const end = Math.max(lastIdx, curIdx);
+          for (let i = start; i <= end; i++) rows[i].selected = true;
+        }
+        render();
+      } else {
+        const row = rows.find(r => r.id === id);
+        if (row) {
+          row.selected = checked;
+          row.selected ? trSelected(id) : trDeselected(id);
+          updateCheckAll();
+          lastClickedRowId = id;
+        }
+      }
+      updateInfo();
+    });
+  });
+
+  // Right-click context menu on table rows
+  document.querySelectorAll('tbody tr').forEach(tr => {
+    tr.addEventListener('contextmenu', e => {
+      e.preventDefault();
+      showCtxMenu(e, parseInt(tr.dataset.id));
+    });
+  });
+
+  // Drag & Drop: drag handle initiates drag, row handles drop target
+  document.querySelectorAll('.drag-handle').forEach(handle => {
+    handle.addEventListener('dragstart', handleDragStart);
+    handle.addEventListener('dragend', handleDragEnd);
+  });
+  document.querySelectorAll('tbody tr').forEach(tr => {
+    tr.addEventListener('dragover', handleDragOver);
+    tr.addEventListener('dragleave', handleDragLeave);
+    tr.addEventListener('drop', handleDrop);
+  });
+}
+
+// ========== Drag & Drop ==========
+let dragRowIds = [];      // IDs of rows being dragged
+let dragMode = 'move';    // 'move' or 'copy'
+let dropTargetIdx = -1;   // Target index for drop
+let dropPosition = null;  // 'top' or 'bottom'
+
+function handleDragStart(e) {
+  const tr = e.currentTarget.closest('tr');
+  if (!tr) return;
+  const rowId = parseInt(tr.dataset.id);
+  const row = rows.find(r => r.id === rowId);
+  if (!row) return;
+
+  // Determine which rows to drag
+  if (row.selected) {
+    // Drag all selected rows (keep order)
+    dragRowIds = rows.filter(r => r.selected).map(r => r.id);
+  } else {
+    // Drag just this row
+    dragRowIds = [rowId];
+  }
+
+  // Default move mode; Ctrl key during drag switches to copy
+  dragMode = 'move';
+  e.dataTransfer.effectAllowed = 'copyMove';
+  e.dataTransfer.setData('text/plain', ''); // Required for Firefox
+
+  // Visual feedback
+  tr.classList.add(dragMode === 'copy' ? 'drag-copy' : 'dragging');
+
+  // Also highlight all dragged rows
+  if (dragRowIds.length > 1) {
+    dragRowIds.forEach(id => {
+      const otherTr = document.querySelector(`tr[data-id="${id}"]`);
+      if (otherTr && otherTr !== tr) otherTr.classList.add(dragMode === 'copy' ? 'drag-copy' : 'dragging');
+    });
+  }
+}
+
+function handleDragEnd(e) {
+  // Clean up all visual states
+  document.querySelectorAll('tbody tr').forEach(tr => {
+    tr.classList.remove('dragging', 'drag-copy', 'drag-over-top', 'drag-over-bottom', 'drag-copy-mode');
+  });
+  dragRowIds = [];
+  dropTargetIdx = -1;
+  dropPosition = null;
+}
+
+function handleDragOver(e) {
+  e.preventDefault();
+  const tr = e.currentTarget;
+  const targetId = parseInt(tr.dataset.id);
+
+  // Don't show drop indicator on a row that's being dragged
+  if (dragRowIds.includes(targetId)) return;
+
+  // Ctrl key = copy mode
+  dragMode = e.ctrlKey ? 'copy' : 'move';
+
+  // Determine drop position (top half or bottom half of row)
+  const rect = tr.getBoundingClientRect();
+  const midY = rect.top + rect.height / 2;
+  const pos = e.clientY < midY ? 'top' : 'bottom';
+
+  // Remove all indicators first
+  document.querySelectorAll('tbody tr').forEach(r => {
+    r.classList.remove('drag-over-top', 'drag-over-bottom', 'drag-copy-mode');
+  });
+
+  // Add indicator (green border for copy, blue for move)
+  tr.classList.add(pos === 'top' ? 'drag-over-top' : 'drag-over-bottom');
+  if (dragMode === 'copy') tr.classList.add('drag-copy-mode');
+  dropTargetIdx = rows.findIndex(r => r.id === targetId);
+  dropPosition = pos;
+
+  e.dataTransfer.dropEffect = dragMode === 'copy' ? 'copy' : 'move';
+}
+
+function handleDragLeave(e) {
+  e.currentTarget.classList.remove('drag-over-top', 'drag-over-bottom');
+}
+
+function handleDrop(e) {
+  e.preventDefault();
+  const tr = e.currentTarget;
+  tr.classList.remove('drag-over-top', 'drag-over-bottom');
+
+  if (dragRowIds.length === 0 || dropTargetIdx < 0) return;
+
+  const targetId = parseInt(tr.dataset.id);
+  // Don't drop onto itself
+  if (dragRowIds.includes(targetId)) return;
+
+  // Calculate insertion index
+  let insertIdx = dropPosition === 'top' ? dropTargetIdx : dropTargetIdx + 1;
+
+  // Get the actual row objects being dragged
+  const draggedRows = dragRowIds.map(id => rows.find(r => r.id === id)).filter(Boolean);
+
+  if (draggedRows.length === 0) return;
+
+  pushHistory();
+
+  if (dragMode === 'move') {
+    // Move: remove from current position, then insert at new position
+    // Need to adjust insertIdx after removal
+    rows = rows.filter(r => !dragRowIds.includes(r.id));
+    // Recalculate insert index after removal
+    const actualInsertIdx = rows.length >= insertIdx ? insertIdx : rows.length;
+    // But also check if the target was before or after the dragged rows
+    const firstDragOriginalIdx = draggedRows[0] ? rows.findIndex(r => r.id === draggedRows[0].id) : -1;
+    rows.splice(insertIdx, 0, ...draggedRows);
+    showToast(`已移动 ${draggedRows.length} 行`);
+  } else {
+    // Copy: clone rows and insert
+    const clonedRows = draggedRows.map(r => {
+      const clone = { ...r };
+      clone.id = nextId++;
+      clone.selected = false;
+      return clone;
+    });
+    rows.splice(insertIdx, 0, ...clonedRows);
+    showToast(`已复制 ${clonedRows.length} 行到新位置`);
+  }
+
+  // Clean up
+  document.querySelectorAll('tbody tr').forEach(r => {
+    r.classList.remove('dragging', 'drag-copy', 'drag-over-top', 'drag-over-bottom', 'drag-copy-mode');
+  });
+  dragRowIds = [];
+  dropTargetIdx = -1;
+  dropPosition = null;
+
+  render();
+}
+
+// ========== Copy (Ctrl+C) ==========
+function copyRows(rowIds) {
+  if (rowIds.length === 0) return;
+  // Build TSV: each row is tab-separated fields
+  const lines = rowIds.map(id => {
+    const r = rows.find(r => r.id === id);
+    if (!r) return '';
+    return CLIP_FIELDS.map(f => {
+      let v = r[f] ?? '';
+      if (v === '') v = '';
+      return String(v);
+    }).join('\t');
+  });
+  clipboard = { type: 'rows', data: lines };
+  // Also put raw TSV on system clipboard
+  navigator.clipboard.writeText(lines.join('\n')).catch(() => {});
+  return lines;
+}
+
+function handleCopy() {
+  // Priority 1: selected rows
+  const selectedIds = rows.filter(r => r.selected).map(r => r.id);
+  if (selectedIds.length > 0) {
+    const lines = copyRows(selectedIds);
+    showToast(`已复制 ${lines.length} 行`);
+    return;
+  }
+  // Priority 2: last focused row
+  if (lastFocusedRowId) {
+    const lines = copyRows([lastFocusedRowId]);
+    showToast(`已复制 1 行`);
+  }
+}
+
+// ========== Paste — driven by native paste event (no permission needed) ==========
+function handlePaste() {
+  // This function is intentionally left empty.
+  // Paste is handled via document.addEventListener('paste', ...) below.
+}
+
+function pasteText(text) {
+  if (!text || !text.trim()) return;
+
+  // Parse TSV
+  const lines = text.split(/\r?\n/).filter(l => l.trim() !== '');
+  if (lines.length === 0) return;
+
+  // Priority 1: single value paste into focused cell (one line, no tabs, focus on a cell)
+  if (lines.length === 1 && lines[0].indexOf('\t') === -1 && lastFocusedRowId && lastFocusedField) {
+    const r = rows.find(r => r.id === lastFocusedRowId);
+    if (r) {
+      const val = lines[0].trim();
+      let newVal;
+      if (lastFocusedField === 'qty' || lastFocusedField === 'line' || lastFocusedField === 'year') {
+        newVal = parseInt(val) || '';
+      } else {
+        newVal = val;
+      }
+      if (r[lastFocusedField] !== newVal) {
+        pushHistory();
+        r[lastFocusedField] = newVal;
+      }
+      render();
+      showToast('已粘贴');
+      return;
+    }
+  }
+
+  // Priority 2: row paste (multi-column TSV)
+  // Determine where to paste
+  let insertIdx = rows.length; // Default: append at end
+  if (lastFocusedRowId) {
+    const fi = rows.findIndex(r => r.id === lastFocusedRowId);
+    if (fi >= 0) insertIdx = fi + 1; // After focused row
+  }
+
+  const parsedRows = [];
+  for (const line of lines) {
+    const cells = line.split('\t');
+    const data = {};
+    // Auto-detect column offset: if first cell looks like a year (4-digit), treat as first field
+    let offset = 0;
+    if (cells.length > 1 && /^\d{4}$/.test(String(cells[0]).trim())) {
+      offset = 0;
+    } else if (cells.length > 20) {
+      offset = 0;
+    }
+
+    CLIP_FIELDS.forEach((f, i) => {
+      const val = (cells[i + offset] || '').trim();
+      if (val === '') return;
+      if (f === 'qty' || f === 'line' || f === 'year') {
+        data[f] = parseInt(val) || '';
+      } else {
+        data[f] = val;
+      }
+    });
+    parsedRows.push(data);
+  }
+
+  // Filter rows that actually have any data
+  const validRows = parsedRows.filter(d => Object.keys(d).length > 0);
+  if (validRows.length === 0) return;
+
+  // Insert rows at insertIdx
+  pushHistory();
+  const newRows = validRows.map(d => newRow(d));
+  rows.splice(insertIdx, 0, ...newRows);
+  clipboard = { type: 'rows', data: lines };
+  render();
+  showToast(`已粘贴 ${validRows.length} 行`);
+
+  // Scroll to pasted area
+  const targetRow = document.querySelector(`tr[data-id="${newRows[0].id}"]`);
+  if (targetRow) {
+    targetRow.scrollIntoView({ block: 'center', behavior: 'smooth' });
+  }
+}
+
+// ========== Insert row at position ==========
+function insertRowAt(index, data = {}) {
+  pushHistory();
+  const r = newRow(data);
+  rows.splice(index, 0, r);
+  render();
+  // Scroll to the new row
+  setTimeout(() => {
+    const targetRow = document.querySelector(`tr[data-id="${r.id}"]`);
+    if (targetRow) targetRow.scrollIntoView({ block: 'center', behavior: 'smooth' });
+  }, 50);
+  return r;
+}
+
+// ========== Context menu ==========
+let ctxRowId = null;
+
+function showCtxMenu(e, rowId) {
+  ctxRowId = rowId;
+  const menu = document.getElementById('ctxMenu');
+  menu.classList.add('show');
+  // Update paste item state
+  const pasteItem = document.getElementById('ctxPasteItem');
+  if (clipboard) {
+    pasteItem.classList.remove('disabled');
+  } else {
+    pasteItem.classList.add('disabled');
+  }
+  // Position
+  let x = e.clientX, y = e.clientY;
+  // Ensure menu stays within viewport
+  setTimeout(() => {
+    const rect = menu.getBoundingClientRect();
+    if (x + rect.width > window.innerWidth) x = window.innerWidth - rect.width - 8;
+    if (y + rect.height > window.innerHeight) y = window.innerHeight - rect.height - 8;
+    menu.style.left = x + 'px';
+    menu.style.top = y + 'px';
+  }, 0);
+  menu.style.left = x + 'px';
+  menu.style.top = y + 'px';
+}
+
+function hideCtxMenu() {
+  document.getElementById('ctxMenu').classList.remove('show');
+}
+
+function ctxInsertAbove() {
+  hideCtxMenu();
+  if (ctxRowId == null) return;
+  const idx = rows.findIndex(r => r.id === ctxRowId);
+  if (idx >= 0) insertRowAt(idx);
+}
+
+function ctxInsertBelow() {
+  hideCtxMenu();
+  if (ctxRowId == null) return;
+  const idx = rows.findIndex(r => r.id === ctxRowId);
+  if (idx >= 0) insertRowAt(idx + 1);
+}
+
+function ctxCopyRow() {
+  hideCtxMenu();
+  if (ctxRowId == null) return;
+  copyRows([ctxRowId]);
+  showToast('已复制 1 行');
+}
+
+function ctxCopyRows() {
+  hideCtxMenu();
+  const selectedIds = rows.filter(r => r.selected).map(r => r.id);
+  if (selectedIds.length === 0) { showToast('请先勾选要复制的行'); return; }
+  copyRows(selectedIds);
+  showToast(`已复制 ${selectedIds.length} 行`);
+}
+
+function ctxPaste() {
+  hideCtxMenu();
+  if (!clipboard || !clipboard.data) { showToast('剪贴板为空'); return; }
+  // Paste below ctxRowId
+  if (ctxRowId != null) {
+    lastFocusedRowId = ctxRowId;
+  }
+  pasteText(clipboard.data.join('\n'));
+}
+
+function ctxClearRow() {
+  hideCtxMenu();
+  if (ctxRowId == null) return;
+  const r = rows.find(r => r.id === ctxRowId);
+  if (!r) return;
+  pushHistory();
+  CLIP_FIELDS.forEach(f => {
+    if (f === 'year') r[f] = new Date().getFullYear();
+    else if (f === 'qty') r[f] = 1;
+    else if (f === 'purchase') r[f] = '否';
+    else if (f === 'contractAttr') r[f] = 'RICH';
+    else if (f === 'biz') r[f] = 'RICH';
+    else r[f] = '';
+  });
+  render();
+  showToast('已清空此行内容');
+}
+
+// Close context menu on click elsewhere
+document.addEventListener('click', e => {
+  if (!e.target.closest('.ctx-menu')) hideCtxMenu();
+});
+
+// ========== Keyboard shortcuts ==========
+document.addEventListener('keydown', e => {
+  // Ctrl+C: copy
+  if ((e.ctrlKey || e.metaKey) && e.key === 'c') {
+    // Only intercept if focus is inside the table
+    const active = document.activeElement;
+    if (active && (active.closest('.table-wrapper') || active.closest('tbody'))) {
+      // Let native copy work for text inputs (user may be selecting text within a cell)
+      // Only intercept if no text is selected in the input
+      if (active.tagName === 'INPUT' && active.selectionStart !== active.selectionEnd) {
+        return; // Let native copy handle text selection
+      }
+      e.preventDefault();
+      handleCopy();
+    }
+  }
+  // Ctrl+V: let native paste event bubble (handled below in 'paste' listener)
+  // Ctrl+X: cut (copy + delete selected)
+  if ((e.ctrlKey || e.metaKey) && e.key === 'x') {
+    const active = document.activeElement;
+    if (active && active.closest('.table-wrapper') && active.tagName !== 'INPUT') {
+      const selectedIds = rows.filter(r => r.selected).map(r => r.id);
+      if (selectedIds.length > 0) {
+        e.preventDefault();
+        pushHistory();
+        copyRows(selectedIds);
+        rows = rows.filter(r => !r.selected);
+        document.getElementById('checkAll').checked = false;
+        render();
+        showToast(`已剪切 ${selectedIds.length} 行`);
+      } else if (lastFocusedRowId) {
+        e.preventDefault();
+        pushHistory();
+        copyRows([lastFocusedRowId]);
+        rows = rows.filter(r => r.id !== lastFocusedRowId);
+        lastFocusedRowId = null;
+        render();
+        showToast('已剪切 1 行');
+      }
+    }
+  }
+  // Escape: close menus
+  if (e.key === 'Escape') {
+    hideCtxMenu();
+    hideAutocomplete();
+  }
+  // Ctrl+Z: undo
+  if ((e.ctrlKey || e.metaKey) && e.key === 'z' && !e.shiftKey) {
+    if (undoStack.length > 0) {
+      e.preventDefault();
+      undo();
+    }
+  }
+  // Ctrl+Y or Ctrl+Shift+Z: redo
+  if ((e.ctrlKey || e.metaKey) && (e.key === 'y' || (e.key === 'z' && e.shiftKey))) {
+    if (redoStack.length > 0) {
+      e.preventDefault();
+      redo();
+    }
+  }
+});
+
+// ========== Native paste event (no clipboard permission needed) ==========
+document.addEventListener('paste', e => {
+  const active = document.activeElement;
+  // Only intercept paste when focus is inside the table wrapper
+  if (!active || (!active.closest('.table-wrapper') && !active.closest('tbody'))) return;
+
+  const text = e.clipboardData ? e.clipboardData.getData('text') : '';
+  if (!text) return;
+
+  // If focus is on an editable element (input/select/textarea) and no rows
+  // are selected and no internal clipboard, let native paste fill the cell.
+  const selectedIds = rows.filter(r => r.selected).map(r => r.id);
+  if ((active.tagName === 'INPUT' || active.tagName === 'SELECT' || active.tagName === 'TEXTAREA')
+      && selectedIds.length === 0 && !clipboard) {
+    return;
+  }
+
+  // Otherwise intercept and use our row-paste logic
+  e.preventDefault();
+  pasteText(text);
+});
+
+// ========== Autocomplete ==========
+let acInput = null;
+let acIndex = -1;
+let acItems = [];
+
+function showAutocomplete(inputEl) {
+  if (modelRef.length === 0) return;
+  acInput = inputEl;
+  const query = inputEl.value.trim().toLowerCase();
+  const ac = document.getElementById('autocomplete');
+
+  if (!query && inputEl.value !== '') {
+    ac.classList.remove('show');
+    return;
+  }
+
+  let filtered = modelRef;
+  if (query) {
+    filtered = modelRef.filter(m =>
+      m.model.toLowerCase().includes(query)
+    );
+  }
+
+  filtered = filtered.slice(0, 50);
+  acItems = filtered;
+
+  if (filtered.length === 0) {
+    ac.classList.remove('show');
+    return;
+  }
+
+  let html = '';
+  filtered.forEach((m, i) => {
+    html += `<div class="ac-item" data-index="${i}">
+      <span class="ac-model">${esc(m.model)}</span>
+      <span class="ac-name">${esc(m.name)}</span>
+      <span class="ac-attr">${esc(m.attr)}</span>
+    </div>`;
+  });
+  ac.innerHTML = html;
+  acIndex = -1;
+
+  const rect = inputEl.getBoundingClientRect();
+  ac.style.left = rect.left + 'px';
+  ac.style.top = (rect.bottom + 2) + 'px';
+  ac.classList.add('show');
+
+  ac.querySelectorAll('.ac-item').forEach(item => {
+    item.addEventListener('mousedown', e => {
+      e.preventDefault();
+      selectAcItem(parseInt(item.dataset.index));
+    });
+    item.addEventListener('mouseenter', () => {
+      acItems.forEach((_, i) => ac.children[i]?.classList.remove('active'));
+      item.classList.add('active');
+      acIndex = parseInt(item.dataset.index);
+    });
+  });
+}
+
+function hideAutocomplete() {
+  document.getElementById('autocomplete').classList.remove('show');
+  acInput = null;
+  acIndex = -1;
+  acItems = [];
+}
+
+function handleAcKeydown(e) {
+  const ac = document.getElementById('autocomplete');
+  if (!ac.classList.contains('show')) return;
+
+  if (e.key === 'ArrowDown') {
+    e.preventDefault();
+    acIndex = Math.min(acIndex + 1, acItems.length - 1);
+    updateAcHighlight();
+  } else if (e.key === 'ArrowUp') {
+    e.preventDefault();
+    acIndex = Math.max(acIndex - 1, 0);
+    updateAcHighlight();
+  } else if (e.key === 'Enter') {
+    e.preventDefault();
+    if (acIndex >= 0) selectAcItem(acIndex);
+  } else if (e.key === 'Escape') {
+    hideAutocomplete();
+  }
+}
+
+function updateAcHighlight() {
+  const ac = document.getElementById('autocomplete');
+  ac.querySelectorAll('.ac-item').forEach((item, i) => {
+    item.classList.toggle('active', i === acIndex);
+  });
+  if (ac.children[acIndex]) {
+    ac.children[acIndex].scrollIntoView({ block: 'nearest' });
+  }
+}
+
+function selectAcItem(index) {
+  const m = acItems[index];
+  if (!m || !acInput) return;
+
+  const id = parseInt(acInput.dataset.id);
+  const row = rows.find(r => r.id === id);
+  if (!row) return;
+
+  pushHistory();
+  row.model = m.model;
+  row.equipName = m.name;
+  row.attr = m.attr;
+  row.dept = m.dept;
+  row.biz = m.biz;
+
+  hideAutocomplete();
+  render();
+  showToast(`已填充: ${m.model}`);
+
+  // Only auto-add row if the selected row is the last one
+  if (row === rows[rows.length - 1]) {
+    setTimeout(() => {
+      addRow();
+    }, 100);
+  }
+}
+
+// ========== Export ==========
+function saveExcel() {
+  if (rows.length === 0) { showToast('没有数据可保存'); return; }
+
+  const headers = ['序号','年份','项目号','虚拟码','合同号','设备名称','型号','补充型号','属性','撬块归属','工序','设计备注','数量','是否整机外购','位置','合同属性','业务归属','责任部门','油漆','铭牌','条线','特殊标记'];
+  const fields = ['year','projectNo','virtualCode','contractNo','equipName','model','subModel','attr','blockOwner','process','designNote','qty','purchase','position','contractAttr','biz','dept','paint','nameplate','line','specialMark'];
+
+  const data = [headers];
+  rows.forEach((r, i) => {
+    data.push([i + 1, ...fields.map(f => r[f] ?? '')]);
+  });
+
+  const ws = XLSX.utils.aoa_to_sheet(data);
+  ws['!cols'] = [
+    {wch:6},{wch:8},{wch:12},{wch:10},{wch:12},{wch:22},{wch:38},{wch:20},{wch:15},{wch:12},{wch:8},{wch:18},{wch:8},{wch:14},{wch:10},{wch:10},{wch:10},{wch:10},{wch:12},{wch:10},{wch:6},{wch:12}
+  ];
+
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, '设备清单');
+
+  // Export timer data as a separate sheet
+  const timerTotal = getTimerTotal();
+  const timerWs = XLSX.utils.aoa_to_sheet([
+    ['项目', '值'],
+    ['累计工时（秒）', timerTotal],
+    ['导出时间', new Date().toLocaleString('zh-CN')]
+  ]);
+  timerWs['!cols'] = [{wch:16}, {wch:20}];
+  XLSX.utils.book_append_sheet(wb, timerWs, '工时记录');
+
+  XLSX.writeFile(wb, `设备清单_${new Date().toISOString().slice(0,10)}.xlsx`);
+  showToast('已保存（含工时记录）');
+}
+
+// ========== Export (no timer) ==========
+function exportExcel() {
+  if (rows.length === 0) { showToast('没有数据可导出'); return; }
+
+  const headers = ['序号','年份','项目号','虚拟码','合同号','设备名称','型号','补充型号','属性','撬块归属','工序','设计备注','数量','是否整机外购','位置','合同属性','业务归属','责任部门','油漆','铭牌','条线','特殊标记'];
+  const fields = ['year','projectNo','virtualCode','contractNo','equipName','model','subModel','attr','blockOwner','process','designNote','qty','purchase','position','contractAttr','biz','dept','paint','nameplate','line','specialMark'];
+
+  const data = [headers];
+  rows.forEach((r, i) => {
+    data.push([i + 1, ...fields.map(f => r[f] ?? '')]);
+  });
+
+  const ws = XLSX.utils.aoa_to_sheet(data);
+  ws['!cols'] = [
+    {wch:6},{wch:8},{wch:12},{wch:10},{wch:12},{wch:22},{wch:38},{wch:20},{wch:15},{wch:12},{wch:8},{wch:18},{wch:8},{wch:14},{wch:10},{wch:10},{wch:10},{wch:10},{wch:12},{wch:10},{wch:6},{wch:12}
+  ];
+
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, '设备清单');
+
+  XLSX.writeFile(wb, `设备清单_${new Date().toISOString().slice(0,10)}.xlsx`);
+  showToast('导出成功');
+}
+
+// ========== Import ==========
+document.getElementById('importFile').addEventListener('change', function(e) {
+  const file = e.target.files[0];
+  if (!file) return;
+
+  const reader = new FileReader();
+  reader.onload = function(ev) {
+    try {
+      const wb = XLSX.read(ev.target.result, { type: 'array' });
+      const ws = wb.Sheets[wb.SheetNames[0]];
+      const json = XLSX.utils.sheet_to_json(ws, { header: 1 });
+
+      if (json.length < 2) { showToast('文件内容为空'); return; }
+
+      let imported = 0;
+      for (let i = 1; i < json.length; i++) {
+        const row = json[i];
+        if (!row || row.length === 0) continue;
+        if (row.every(c => c == null || c === '')) continue;
+
+        addRow({
+          year: row[1] || new Date().getFullYear(),
+          projectNo: row[2] || '',
+          virtualCode: row[3] || '',
+          contractNo: row[4] || '',
+          equipName: row[5] || '',
+          model: row[6] || '',
+          subModel: row[7] || '',
+          attr: row[8] || '',
+          blockOwner: row[9] || '',
+          process: row[10] || '',
+          designNote: row[11] || '',
+          qty: parseInt(row[12]) || 1,
+          purchase: row[13] || '否',
+          position: row[14] || '',
+          contractAttr: row[15] || 'RICH',
+          biz: row[16] || 'RICH',
+          dept: row[17] || '',
+          paint: row[18] || '',
+          nameplate: row[19] || '',
+          line: parseInt(row[20]) || '',
+          specialMark: row[21] || '',
+        });
+        imported++;
+      }
+
+      // Restore timer from "工时记录" sheet if present
+      const timerSheetName = wb.SheetNames.find(n => n.includes('工时'));
+      if (timerSheetName) {
+        const timerJson = XLSX.utils.sheet_to_json(wb.Sheets[timerSheetName], { header: 1 });
+        const timerRow = timerJson.find(r => r[0] === '累计工时（秒）');
+        if (timerRow && timerRow[1]) {
+          const sec = parseInt(timerRow[1]);
+          if (sec > 0) {
+            timerPause();
+            timerElapsed = sec;
+            updateTimerDisplay();
+          }
+        }
+      }
+
+      showToast(`成功导入 ${imported} 条记录${timerSheetName ? '（含工时）' : ''}`);
+    } catch(err) {
+      console.error(err);
+      showToast('导入失败: ' + err.message);
+    }
+  };
+  reader.readAsArrayBuffer(file);
+  e.target.value = '';
+});
+
+// ========== Contract number fill ==========
+document.getElementById('contractFile').addEventListener('change', function(e) {
+  const file = e.target.files[0];
+  if (!file) return;
+
+  const reader = new FileReader();
+  reader.onload = function(ev) {
+    try {
+      const wb = XLSX.read(ev.target.result, { type: 'array' });
+      const ws = wb.Sheets[wb.SheetNames[0]];
+      const json = XLSX.utils.sheet_to_json(ws, { header: 1 });
+
+      if (json.length < 2) { showToast('定单表内容为空'); e.target.value = ''; return; }
+
+      // Find column indices by header names
+      const headers = json[0].map(h => String(h || '').trim());
+      const findCol = (names) => {
+        for (let i = 0; i < headers.length; i++) {
+          for (const n of names) { if (headers[i].includes(n)) return i; }
+        }
+        return -1;
+      };
+      const colModel = findCol(['型号']);
+      const colLine = findCol(['条线']);
+      const colPos = findCol(['位置']);
+      const colContract = findCol(['合同号']);
+
+      if (colModel < 0) { showToast('未找到「型号」列，请检查定单表表头'); e.target.value = ''; return; }
+      if (colContract < 0) { showToast('未找到「合同号」列，请检查定单表表头'); e.target.value = ''; return; }
+
+      // Build contract pool: key = "model|line|position" → [contractNos]
+      const pool = {};
+      for (let i = 1; i < json.length; i++) {
+        const r = json[i];
+        if (!r || r.length === 0) continue;
+        const m = String(r[colModel] || '').trim();
+        const l = colLine >= 0 ? String(r[colLine] || '').trim() : '';
+        const p = colPos >= 0 ? String(r[colPos] || '').trim() : '';
+        const c = String(r[colContract] || '').trim();
+        if (!m || !c || c === '0' || c === '-') continue;
+        const key = `${m}|${l}|${p}`;
+        if (!pool[key]) pool[key] = [];
+        pool[key].push(c);
+      }
+
+      if (Object.keys(pool).length === 0) { showToast('定单表中无有效数据'); e.target.value = ''; return; }
+
+      // Fill contract numbers in page order
+      pushHistory();
+      let filled = 0;
+      const usedContracts = new Set();
+      rows.forEach(r => {
+        const key = `${r.model || ''}|${r.line || ''}|${r.position || ''}`;
+        const contracts = pool[key];
+        if (!contracts || contracts.length === 0) return;
+        // Take first unused contract
+        for (let ci = 0; ci < contracts.length; ci++) {
+          const c = contracts[ci];
+          if (!usedContracts.has(c)) {
+            r.contractNo = c;
+            usedContracts.add(c);
+            filled++;
+            break;
+          }
+        }
+      });
+
+      render();
+      const totalContracts = Object.values(pool).reduce((s, a) => s + a.length, 0);
+      showToast('已填充 ' + filled + ' 个合同号（定单表共 ' + totalContracts + ' 条记录）');
+    } catch(err) {
+      console.error(err);
+      showToast('读取失败: ' + err.message);
+    }
+  };
+  reader.readAsArrayBuffer(file);
+  e.target.value = '';
+});
+
+function clearContracts() {
+  const count = rows.filter(r => r.contractNo && String(r.contractNo).trim() !== '').length;
+  if (count === 0) { showToast('合同号列已为空'); return; }
+  showModal('清空合同号', '确定要清空 ' + count + ' 行的合同号吗？', () => {
+    pushHistory();
+    rows.forEach(r => r.contractNo = '');
+    render();
+    showToast('已清空 ' + count + ' 个合同号');
+  }, null, '确认清空');
+}
+
+// ========== Init ==========
+(function init() {
+  function initAfterCheck() {
+    // Try to load reference data from cache
+    loadRefFromCache();
+
+    // Add 3 empty rows
+    // Add default rows to fill one page (~38px per row)
+    const rowH = 38;
+    const headerH = 200;
+    const count = Math.max(5, Math.floor((window.innerHeight - headerH) / rowH));
+    for (let i = 0; i < count; i++) addRow({}, true);
+
+    // Save initial state as first history entry
+    undoStack = [];
+    redoStack = [];
+
+    // Start auto-save timer
+    startAutoSave();
+
+    // Init row density
+    initDensity();
+
+    // Init timer
+    initTimer();
+
+    // Init non-essential toggle
+    initNonEssential();
+
+    // Build special mark panel
+    buildSmarkPanel();
+  }
+
+  // Check auto-save recovery first (async: may show dialog)
+  checkAutoSave(() => {
+    // Restored from auto-save - still init the rest
+    loadRefFromCache();
+    undoStack = [];
+    redoStack = [];
+    startAutoSave();
+
+    // Init row density
+    initDensity();
+
+    // Init timer
+    initTimer();
+
+    // Init non-essential toggle
+    initNonEssential();
+
+    // Build special mark panel
+    buildSmarkPanel();
+  }, () => {
+    // No auto-save data or user declined - normal init
+    initAfterCheck();
+  });
+
+  // Row density selector
+  document.getElementById('rowDensity').addEventListener('change', e => {
+    setDensity(e.target.value);
+  });
+
+  // Filter input
+  const filterInput = document.getElementById('filterInput');
+  filterInput.addEventListener('input', e => {
+    filterText = e.target.value.trim();
+    render();
+  });
+  // Filter field change: re-apply if text is present
+  document.getElementById('filterField').addEventListener('change', () => {
+    if (filterText) render();
+  });
+
+  // Virtual scroll: re-render on scroll
+  let vsTimer = null;
+  document.querySelector('.table-wrapper').addEventListener('scroll', () => {
+    if (vsTimer) cancelAnimationFrame(vsTimer);
+    vsTimer = requestAnimationFrame(() => render());
+  });
+})();
+
+// Global clear filter (called from button)
+function clearFilter() {
+  filterText = '';
+  document.getElementById('filterInput').value = '';
+  render();
+}
+
+// Close autocomplete on click outside
+document.addEventListener('click', e => {
+  if (!e.target.closest('.model-input-wrap') && !e.target.closest('.autocomplete')) {
+    hideAutocomplete();
+  }
+});
+</script>
+</body>
 </html>
