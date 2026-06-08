@@ -1495,8 +1495,8 @@ function bindEvents() {
       pushHistory();
       row[field] = newVal;
 
-      // Batch fill: position, line, paint, nameplate apply to all selected rows
-      if ((field === 'position' || field === 'line' || field === 'paint' || field === 'nameplate') && row.selected) {
+      // Batch fill: position, line, paint, nameplate, year, projectNo apply to all selected rows
+      if ((field === 'position' || field === 'line' || field === 'paint' || field === 'nameplate' || field === 'year' || field === 'projectNo') && row.selected) {
         const selectedRows = rows.filter(r => r.selected && r.id !== id);
         if (selectedRows.length > 0) {
           selectedRows.forEach(r => { r[field] = newVal; });
@@ -1507,7 +1507,7 @@ function bindEvents() {
               if (el) el.value = newVal || '';
             }
           });
-          const labels = { position:'位置', line:'条线', paint:'油漆', nameplate:'铭牌' };
+          const labels = { position:'位置', line:'条线', paint:'油漆', nameplate:'铭牌', year:'年份', projectNo:'项目号' };
           showToast(`已批量填写 ${labels[field]}（${selectedRows.length + 1} 行）`);
         }
       }
@@ -2374,12 +2374,13 @@ document.getElementById('contractFile').addEventListener('change', function(e) {
       const colLine = findCol(['条线']);
       const colPos = findCol(['位置']);
       const colAttr = findCol(['属性']);
+      const colProject = findCol(['项目号']);
       const colContract = findCol(['合同号']);
 
       if (colModel < 0) { showToast('未找到「型号」列，请检查定单表表头'); e.target.value = ''; return; }
       if (colContract < 0) { showToast('未找到「合同号」列，请检查定单表表头'); e.target.value = ''; return; }
 
-      // Build contract pool: key = "model|line|position|attr" → [contractNos]
+      // Build contract pool: key = "projectNo|model|line|position|attr" → [contractNos]
       const pool = {};
       for (let i = 1; i < json.length; i++) {
         const r = json[i];
@@ -2388,9 +2389,10 @@ document.getElementById('contractFile').addEventListener('change', function(e) {
         const l = colLine >= 0 ? String(r[colLine] || '').trim() : '';
         const p = colPos >= 0 ? String(r[colPos] || '').trim() : '';
         const d = colAttr >= 0 ? String(r[colAttr] || '').trim() : '';
+        const proj = colProject >= 0 ? String(r[colProject] || '').trim() : '';
         const c = String(r[colContract] || '').trim();
         if (!m || !c || c === '0' || c === '-') continue;
-        const key = `${m}|${l}|${p}|${d}`;
+        const key = `${proj}|${m}|${l}|${p}|${d}`;
         if (!pool[key]) pool[key] = [];
         pool[key].push(c);
       }
@@ -2402,7 +2404,7 @@ document.getElementById('contractFile').addEventListener('change', function(e) {
       let filled = 0;
       const usedContracts = new Set();
       rows.forEach(r => {
-        const key = `${r.model || ''}|${r.line || ''}|${r.position || ''}|${r.attr || ''}`;
+        const key = `${r.projectNo || ''}|${r.model || ''}|${r.line || ''}|${r.position || ''}|${r.attr || ''}`;
         const contracts = pool[key];
         if (!contracts || contracts.length === 0) return;
         // Take first unused contract
