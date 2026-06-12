@@ -1385,6 +1385,12 @@ function showToast(msg) {
   setTimeout(() => t.classList.remove('show'), 2500);
 }
 
+// ========== HTML Escape ==========
+function escHtml(s) {
+  if (s == null) return '';
+  return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+
 // ========== Modal ==========
 function showModal(title, msg, onConfirm, onCancel, confirmText) {
   document.getElementById('modalTitle').textContent = title;
