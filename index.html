@@ -586,6 +586,40 @@ table.hide-nonessential .col-nameplate {
   background: var(--border);
   margin: 4px 0;
 }
+/* 存档系统样式 */
+.archive-overlay{position:fixed;inset:0;background:rgba(0,0,0,0.3);z-index:150;display:none;align-items:flex-start;justify-content:center;padding-top:60px}
+.archive-overlay.show{display:flex}
+.archive-panel{background:var(--card);border-radius:8px;width:520px;max-width:90vw;max-height:70vh;display:flex;flex-direction:column;box-shadow:0 8px 30px rgba(0,0,0,0.15);border:1px solid var(--border)}
+.archive-header{padding:10px 16px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between}
+.archive-header h3{font-size:14px;font-weight:600;margin:0}
+.archive-header .btn{font-size:11px}
+.archive-body{flex:1;overflow-y:auto;padding:10px 16px;max-height:45vh}
+.archive-empty{text-align:center;padding:24px 16px;color:var(--text-muted)}
+.archive-empty .icon{font-size:32px;margin-bottom:8px}
+.archive-list{display:flex;flex-direction:column;gap:6px}
+.archive-item{background:#f8fafc;border:1px solid var(--border);border-radius:6px;padding:8px 10px;cursor:pointer;transition:all 0.12s}
+.archive-item:hover{border-color:var(--primary);background:var(--primary-light)}
+.archive-item-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:4px}
+.archive-item-name{font-size:12px;font-weight:600;color:var(--text)}
+.archive-item-time{font-size:10px;color:var(--text-muted)}
+.archive-item-meta{display:flex;gap:10px;font-size:10px;color:var(--text-secondary)}
+.archive-item-meta span{display:flex;align-items:center;gap:2px}
+.archive-item-actions{display:flex;gap:4px;margin-top:6px}
+.archive-item-actions .btn{font-size:10px;padding:2px 6px}
+.archive-save-form{padding:10px 16px;border-top:1px solid var(--border);background:#f8fafc;border-radius:0 0 8px 8px}
+.archive-save-row{display:flex;gap:4px;align-items:center}
+.archive-save-row input{flex:1;padding:4px 6px;border:1px solid var(--border);border-radius:4px;font-size:11px;font-family:inherit;outline:none}
+.archive-save-row input:focus{border-color:var(--primary)}
+.archive-save-row .btn{font-size:10px;padding:3px 6px}
+
+/* 按钮分组 */
+.btn-group{display:flex;gap:0}
+.btn-group .btn{border-radius:0}
+.btn-group .btn:first-child{border-radius:6px 0 0 6px}
+.btn-group .btn:last-child{border-radius:0 6px 6px 0}
+.btn-group .btn+.btn{border-left:1px solid rgba(255,255,255,0.2)}
+.btn-group .btn-outline+.btn-outline{border-left-color:var(--border)}
+
 </style>
 </head>
 <body>
@@ -610,17 +644,17 @@ table.hide-nonessential .col-nameplate {
     </div>
     <div class="header-sep"></div>
     <!-- Data import -->
-    <label class="btn btn-warning" title="加载/刷新成品型号对照表（xlsx）">
-      对照表
+    <label class="btn btn-outline" title="加载/刷新成品型号对照表（xlsx）">
+      📋 对照表
       <input type="file" id="refFileInput" accept=".xlsx,.xls" style="display:none">
     </label>
     <label class="btn btn-outline" title="从RICH定单表填充合同号">
-      填合同号
+      📄 填合同号
       <input type="file" id="contractFile" accept=".xlsx,.xls,.csv" style="display:none">
     </label>
-    <button class="btn btn-outline" onclick="clearContracts()" title="清空所有合同号">清合同号</button>
+    <button class="btn btn-outline" onclick="clearContracts()" title="清空所有合同号">清空</button>
     <label class="btn btn-outline" title="导入已有设备清单">
-      导入
+      📥 导入
       <input type="file" id="importFile" accept=".xlsx,.xls" style="display:none">
     </label>
     <div class="header-sep"></div>
@@ -630,8 +664,9 @@ table.hide-nonessential .col-nameplate {
     <div class="header-sep"></div>
     <!-- File output -->
     <span id="autosaveTime" style="color:#94a3b8;font-size:10px;flex-shrink:0"></span>
-    <button class="btn btn-success" onclick="saveExcel()">保存</button>
-    <button class="btn btn-outline" onclick="exportExcel()">导出</button>
+    <button class="btn btn-warning" onclick="showArchivePanel()" title="项目存档管理">📁 存档</button>
+    <button class="btn btn-success" onclick="saveExcel()">💾 保存</button>
+    <button class="btn btn-outline" onclick="exportExcel()">📤 导出</button>
   </div>
 </div>
 
@@ -764,6 +799,28 @@ table.hide-nonessential .col-nameplate {
   </div>
 </div>
 
+<!-- 存档面板 -->
+<div class="archive-overlay" id="archiveOverlay">
+  <div class="archive-panel">
+    <div class="archive-header">
+      <h3>📁 项目存档</h3>
+      <button class="btn btn-outline btn-sm" onclick="closeArchivePanel()">关闭</button>
+    </div>
+    <div class="archive-body" id="archiveBody"></div>
+    <div class="archive-save-form">
+      <div class="archive-save-row">
+        <input type="text" id="archiveName" placeholder="输入项目名称或项目号">
+        <button class="btn btn-primary btn-sm" onclick="saveArchive()">保存</button>
+      </div>
+      <div class="archive-save-row" style="margin-top:6px">
+        <button class="btn btn-outline btn-sm" onclick="exportAllArchives()">📤 导出</button>
+        <button class="btn btn-outline btn-sm" onclick="document.getElementById('archiveImportFile').click()">📥 导入</button>
+        <input type="file" id="archiveImportFile" accept=".json" style="display:none" onchange="importArchives(event)">
+      </div>
+    </div>
+  </div>
+</div>
+
 <script>
 // ========== Data ==========
 let modelRef = [];
@@ -862,6 +919,122 @@ function startAutoSave() {
   autosaveTimer = setInterval(autoSave, 15000);
   // Save on page unload
   window.addEventListener('beforeunload', autoSave);
+}
+
+// ========== Archive System ==========
+const ARCHIVE_KEY = 'deviceList_archives';
+function getArchives(){try{const s=localStorage.getItem(ARCHIVE_KEY);return s?JSON.parse(s):[]}catch(e){return[]}}
+function setArchives(arr){try{localStorage.setItem(ARCHIVE_KEY,JSON.stringify(arr))}catch(e){showToast('存档保存失败，可能存储空间不足')}}
+function showArchivePanel(){
+  document.getElementById('archiveOverlay').classList.add('show');
+  document.getElementById('archiveName').value='';
+  renderArchiveList();
+}
+function closeArchivePanel(){document.getElementById('archiveOverlay').classList.remove('show')}
+function saveArchive(){
+  const nameInput=document.getElementById('archiveName');
+  const name=nameInput.value.trim();
+  if(!name){showToast('请输入项目名称');nameInput.focus();return}
+  const archives=getArchives();
+  const now=new Date();
+  const archive={
+    id:'arch_'+now.getTime(),
+    name:name,
+    time:now.toISOString(),
+    timeStr:now.toLocaleString('zh-CN'),
+    rows:JSON.parse(JSON.stringify(rows)),
+    nextId:nextId,
+    timerElapsed:getTimerTotal(),
+    modelRef:modelRef.length>0?JSON.parse(JSON.stringify(modelRef)):null
+  };
+  archives.unshift(archive);
+  setArchives(archives);
+  showToast('已保存存档: '+name);
+  renderArchiveList();
+  nameInput.value='';
+}
+function loadArchive(id){
+  const archives=getArchives();
+  const arch=archives.find(a=>a.id===id);
+  if(!arch){showToast('存档不存在');return}
+  showModal('加载存档','确定要加载存档 "'+arch.name+'" 吗？当前未保存的工作将被覆盖。',()=>{
+    pushHistory();
+    rows=JSON.parse(JSON.stringify(arch.rows));
+    nextId=arch.nextId||rows.length+1;
+    if(arch.modelRef)modelRef=JSON.parse(JSON.stringify(arch.modelRef));
+    render();
+    autoSave();
+    closeArchivePanel();
+    showToast('已加载存档: '+arch.name);
+  })
+}
+function deleteArchive(id,name){
+  showModal('删除存档','确定要删除存档 "'+name+'" 吗？此操作不可恢复。',()=>{
+    const archives=getArchives().filter(a=>a.id!==id);
+    setArchives(archives);
+    renderArchiveList();
+    showToast('已删除存档: '+name);
+  })
+}
+function renderArchiveList(){
+  const body=document.getElementById('archiveBody');
+  const archives=getArchives();
+  if(archives.length===0){
+    body.innerHTML='<div class="archive-empty"><div class="icon">📭</div><div>暂无存档</div><div style="font-size:12px;margin-top:8px">在下方输入项目名称保存当前配置</div></div>';
+    return;
+  }
+  let h='<div class="archive-list">';
+  archives.forEach(arch=>{
+    const rowCount=arch.rows?arch.rows.length:0;
+    h+='<div class="archive-item">';
+    h+='<div class="archive-item-header">';
+    h+='<span class="archive-item-name">'+escHtml(arch.name)+'</span>';
+    h+='<span class="archive-item-time">'+escHtml(arch.timeStr)+'</span>';
+    h+='</div>';
+    h+='<div class="archive-item-meta">';
+    h+='<span>📋 '+rowCount+' 条记录</span>';
+    h+='<span>'+(arch.modelRef?'✅ 含对照表':'无对照表')+'</span>';
+    h+='</div>';
+    h+='<div class="archive-item-actions">';
+    h+='<button class="btn btn-primary btn-sm" onclick="loadArchive(\''+arch.id+'\')">加载</button>';
+    h+='<button class="btn btn-danger btn-sm" onclick="deleteArchive(\''+arch.id+'\',\''+escHtml(arch.name).replace(/'/g,"\\'")+'\')">删除</button>';
+    h+='</div>';
+    h+='</div>';
+  });
+  h+='</div>';
+  body.innerHTML=h;
+}
+function exportAllArchives(){
+  const archives=getArchives();
+  if(archives.length===0){showToast('暂无存档可导出');return}
+  const data={version:1,exportTime:new Date().toISOString(),archives:archives};
+  const blob=new Blob([JSON.stringify(data,null,2)],{type:'application/json'});
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement('a');
+  a.href=url;a.download='设备清单存档_'+new Date().toISOString().slice(0,10)+'.json';
+  a.click();URL.revokeObjectURL(url);
+  showToast('已导出 '+archives.length+' 个存档');
+}
+function importArchives(e){
+  const file=e.target.files[0];if(!file)return;
+  const reader=new FileReader();
+  reader.onload=function(ev){
+    try{
+      const data=JSON.parse(ev.target.result);
+      if(!data||!Array.isArray(data.archives)){showToast('文件格式无效');return}
+      const existing=getArchives();
+      const existingIds=new Set(existing.map(a=>a.id));
+      let added=0;
+      data.archives.forEach(arch=>{
+        if(!existingIds.has(arch.id)){existing.push(arch);added++}
+      });
+      setArchives(existing);
+      renderArchiveList();
+      showToast('导入完成，新增 '+added+' 个存档');
+    }catch(err){showToast('导入失败: '+err.message)}
+  };
+  reader.readAsText(file);
+  e.target.value='';
 }
 
 // ========== Timer ==========
