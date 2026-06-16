@@ -49,10 +49,10 @@
 ## 文件说明
 
 ```
-TS取码设备清单制作工具/
-├── index.html          # 主程序文件
-├── README.md           # 本文档
-└── .codebuddy/         # 配置目录
+EquipmentList/
+├── index.html          # 主程序文件（HTML + CSS + JS 全部内联）
+├── AGENT.md            # Agent 指南（供 AI 修改参考）
+└── README.md           # 本文档
 ```
 
 ---
