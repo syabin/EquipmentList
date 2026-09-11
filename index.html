@@ -838,7 +838,7 @@ const BIZS = ["RICH","ROSS"];
 const PAINTS = ["外表不锈钢","其他"];
 const NAMEPLATES = ["客户指定","标准铭牌","标准无LOGO"];
 const PURCHASES = ["否","是"];
-const CONTRACT_ATTRS = ["RICH"];
+const CONTRACT_ATTRS = ["RICH", "ROSS"];
 
 const REF_CACHE_KEY = 'deviceList_refData';
 const REF_CACHE_TIME_KEY = 'deviceList_refTime';
@@ -2383,13 +2383,6 @@ function selectAcItem(index) {
   hideAutocomplete();
   render();
   showToast(`已填充: ${m.model}`);
-
-  // Only auto-add row if the selected row is the last one
-  if (row === rows[rows.length - 1]) {
-    setTimeout(() => {
-      addRow();
-    }, 100);
-  }
 }
 
 // ========== Border helper ==========
