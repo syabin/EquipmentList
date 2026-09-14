@@ -408,6 +408,8 @@ tbody td:last-child { border-right: none; }
 .col-paint { width: 100px; min-width: 100px; }
 .col-nameplate { width: 90px; min-width: 90px; }
 .col-line { width: 60px; min-width: 60px; }
+.col-mainEquip { width: 90px; min-width: 90px; }
+.col-matchMark { width: 90px; min-width: 90px; }
 .col-special { width: 90px; min-width: 90px; }
 .col-del { width: 36px; min-width: 36px; }
 
@@ -537,6 +539,38 @@ table.hide-nonessential .col-nameplate {
 }
 .smark-panel .smark-apply:hover { opacity: 0.9; }
 
+/* Contract dropdown menu */
+.cmenu-wrap { position: relative; display: inline-block; }
+.cmenu-panel {
+  display: none;
+  position: absolute;
+  top: 100%;
+  left: 0;
+  margin-top: 4px;
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  box-shadow: 0 4px 20px rgba(0,0,0,0.12);
+  z-index: 50;
+  padding: 6px 0;
+  min-width: 200px;
+}
+.cmenu-panel.show { display: block; }
+.cmenu-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 14px;
+  cursor: pointer;
+  font-size: 13px;
+  color: var(--text);
+  white-space: nowrap;
+  transition: background 0.1s;
+}
+.cmenu-item:hover { background: var(--row-hover); }
+.cmenu-item.danger { color: #dc2626; }
+.cmenu-sep { height: 1px; background: var(--border); margin: 4px 0; }
+
 /* Filter bar */
 .filter-bar {
   display: flex;
@@ -649,11 +683,16 @@ table.hide-nonessential .col-nameplate {
       📋 对照表
       <input type="file" id="refFileInput" accept=".xlsx,.xls" style="display:none">
     </label>
-    <label class="btn btn-outline" title="从RICH定单表填充合同号">
-      📄 填合同号
+    <div class="cmenu-wrap" id="cmenuWrap">
+      <button class="btn btn-outline" id="cmenuBtn" title="合同号：填充 / 模拟 / 清除">📄 合同号 ▾</button>
+      <div class="cmenu-panel" id="cmenuPanel">
+        <div class="cmenu-item" onclick="hideCMenu();triggerContractFile()">📄 填合同号（RICH定单表）</div>
+        <div class="cmenu-item" onclick="hideCMenu();simulateContracts()">⚡ 模拟合同号（仅补空）</div>
+        <div class="cmenu-sep"></div>
+        <div class="cmenu-item danger" onclick="hideCMenu();clearContracts()">🗑 清除合同号</div>
+      </div>
       <input type="file" id="contractFile" accept=".xlsx,.xls,.csv" style="display:none">
-    </label>
-    <button class="btn btn-outline" onclick="clearContracts()" title="清空所有合同号">清空</button>
+    </div>
     <label class="btn btn-outline" title="导入已有设备清单">
       📥 导入
       <input type="file" id="importFile" accept=".xlsx,.xls" style="display:none">
@@ -754,6 +793,8 @@ table.hide-nonessential .col-nameplate {
         <th class="col-paint">油漆</th>
         <th class="col-nameplate">铭牌</th>
         <th class="col-line">条线</th>
+        <th class="col-mainEquip">主设备</th>
+        <th class="col-matchMark">配套标识</th>
         <th class="col-special">特殊标记</th>
         <th class="col-del"></th>
       </tr>
@@ -1255,6 +1296,22 @@ document.addEventListener('click', e => {
   }
 });
 
+// ========== Contract dropdown menu ==========
+function hideCMenu() {
+  const p = document.getElementById('cmenuPanel');
+  if (p) p.classList.remove('show');
+}
+function triggerContractFile() {
+  document.getElementById('contractFile').click();
+}
+document.getElementById('cmenuBtn').addEventListener('click', e => {
+  e.stopPropagation();
+  document.getElementById('cmenuPanel').classList.toggle('show');
+});
+document.addEventListener('click', e => {
+  if (!e.target.closest('#cmenuWrap')) hideCMenu();
+});
+
 function checkAutoSave(onRestored, onSkipped) {
   const saved = localStorage.getItem(AUTOSAVE_KEY);
   const savedTime = localStorage.getItem(AUTOSAVE_TIME_KEY);
@@ -1480,6 +1537,8 @@ function render() {
     html += `<td class="col-paint">${selectHtml('paint', r.id, r.paint, PAINTS)}</td>`;
     html += `<td class="col-nameplate">${selectHtml('nameplate', r.id, r.nameplate, NAMEPLATES)}</td>`;
     html += `<td class="col-line"><input class="cell-input number" type="number" min="1" value="${r.line || ''}" data-field="line" data-id="${r.id}" placeholder="条线"></td>`;
+    html += `<td class="col-mainEquip"><input class="cell-input" value="${esc(r.mainEquip)}" data-field="mainEquip" data-id="${r.id}" placeholder="主设备"></td>`;
+    html += `<td class="col-matchMark"><input class="cell-input" value="${esc(r.matchMark)}" data-field="matchMark" data-id="${r.id}" placeholder="配套标识"></td>`;
     html += `<td class="col-special"><input class="cell-input" value="${esc(r.specialMark)}" data-field="specialMark" data-id="${r.id}" placeholder="特殊标记"></td>`;
     html += `<td class="col-del"><button class="btn btn-danger" style="padding:4px 8px;font-size:11px" onclick="deleteRow(${r.id})" title="删除此行">&times;</button></td>`;
     html += '</tr>';
@@ -1525,7 +1584,7 @@ function updateInfo() {
 }
 
 // Filter match helper: field-level or all-fields
-const FILTER_ALL_FIELDS = ['projectNo','virtualCode','contractNo','equipName','model','subModel','attr','blockOwner','process','designNote','position','contractAttr','biz','dept','paint','nameplate','specialMark','year','qty','line'];
+const FILTER_ALL_FIELDS = ['projectNo','virtualCode','contractNo','equipName','model','subModel','attr','blockOwner','process','designNote','position','contractAttr','biz','dept','paint','nameplate','mainEquip','matchMark','specialMark','year','qty','line'];
 function matchFilter(r, field, q) {
   if (!q) return true;
   if (field) {
@@ -1568,6 +1627,8 @@ function newRow(data = {}) {
     paint: defPaint,
     nameplate: defNameplate,
     line: data.line || '',
+    mainEquip: data.mainEquip || '',
+    matchMark: data.matchMark || '',
     specialMark: data.specialMark || '',
     selected: false
   };
@@ -1649,7 +1710,7 @@ function deleteSelected() {
 }
 
 // ========== Clipboard: fields for copy/paste ==========
-const CLIP_FIELDS = ['year','projectNo','virtualCode','contractNo','equipName','model','subModel','attr','blockOwner','process','designNote','qty','purchase','position','contractAttr','biz','dept','paint','nameplate','line','specialMark'];
+const CLIP_FIELDS = ['year','projectNo','virtualCode','contractNo','equipName','model','subModel','attr','blockOwner','process','designNote','qty','purchase','position','contractAttr','biz','dept','paint','nameplate','line','mainEquip','matchMark','specialMark'];
 let clipboard = null; // {type:'rows'|'tsv', data: [...]}
 let lastFocusedRowId = null;
 let lastFocusedField = null;
@@ -2409,8 +2470,8 @@ function addBorders(ws) {
 function saveExcel() {
   if (rows.length === 0) { showToast('没有数据可保存'); return; }
 
-  const headers = ['序号','年份','项目号','虚拟码','合同号','设备名称','型号','补充型号','属性','撬块归属','工序','设计备注','数量','是否整机外购','位置','合同属性','业务归属','责任部门','油漆','铭牌','条线','特殊标记'];
-  const fields = ['year','projectNo','virtualCode','contractNo','equipName','model','subModel','attr','blockOwner','process','designNote','qty','purchase','position','contractAttr','biz','dept','paint','nameplate','line','specialMark'];
+  const headers = ['序号','年份','项目号','虚拟码','合同号','设备名称','型号','补充型号','属性','撬块归属','工序','设计备注','数量','是否整机外购','位置','合同属性','业务归属','责任部门','油漆','铭牌','条线','主设备','配套标识','特殊标记'];
+  const fields = ['year','projectNo','virtualCode','contractNo','equipName','model','subModel','attr','blockOwner','process','designNote','qty','purchase','position','contractAttr','biz','dept','paint','nameplate','line','mainEquip','matchMark','specialMark'];
 
   const data = [headers];
   rows.forEach((r, i) => {
@@ -2419,7 +2480,7 @@ function saveExcel() {
 
   const ws = XLSX.utils.aoa_to_sheet(data);
   ws['!cols'] = [
-    {wch:6},{wch:8},{wch:12},{wch:10},{wch:12},{wch:22},{wch:38},{wch:20},{wch:15},{wch:12},{wch:8},{wch:18},{wch:8},{wch:14},{wch:10},{wch:10},{wch:10},{wch:10},{wch:12},{wch:10},{wch:6},{wch:12}
+    {wch:6},{wch:8},{wch:12},{wch:10},{wch:12},{wch:22},{wch:38},{wch:20},{wch:15},{wch:12},{wch:8},{wch:18},{wch:8},{wch:14},{wch:10},{wch:10},{wch:10},{wch:10},{wch:12},{wch:10},{wch:6},{wch:12},{wch:12},{wch:12}
   ];
 
   addBorders(ws);
@@ -2445,8 +2506,8 @@ function saveExcel() {
 function exportExcel() {
   if (rows.length === 0) { showToast('没有数据可导出'); return; }
 
-  const headers = ['序号','年份','项目号','虚拟码','合同号','设备名称','型号','补充型号','属性','撬块归属','工序','设计备注','数量','是否整机外购','位置','合同属性','业务归属','责任部门','油漆','铭牌','条线','特殊标记'];
-  const fields = ['year','projectNo','virtualCode','contractNo','equipName','model','subModel','attr','blockOwner','process','designNote','qty','purchase','position','contractAttr','biz','dept','paint','nameplate','line','specialMark'];
+  const headers = ['序号','年份','项目号','虚拟码','合同号','设备名称','型号','补充型号','属性','撬块归属','工序','设计备注','数量','是否整机外购','位置','合同属性','业务归属','责任部门','油漆','铭牌','条线','主设备','配套标识','特殊标记'];
+  const fields = ['year','projectNo','virtualCode','contractNo','equipName','model','subModel','attr','blockOwner','process','designNote','qty','purchase','position','contractAttr','biz','dept','paint','nameplate','line','mainEquip','matchMark','specialMark'];
 
   const data = [headers];
   rows.forEach((r, i) => {
@@ -2455,7 +2516,7 @@ function exportExcel() {
 
   const ws = XLSX.utils.aoa_to_sheet(data);
   ws['!cols'] = [
-    {wch:6},{wch:8},{wch:12},{wch:10},{wch:12},{wch:22},{wch:38},{wch:20},{wch:15},{wch:12},{wch:8},{wch:18},{wch:8},{wch:14},{wch:10},{wch:10},{wch:10},{wch:10},{wch:12},{wch:10},{wch:6},{wch:12}
+    {wch:6},{wch:8},{wch:12},{wch:10},{wch:12},{wch:22},{wch:38},{wch:20},{wch:15},{wch:12},{wch:8},{wch:18},{wch:8},{wch:14},{wch:10},{wch:10},{wch:10},{wch:10},{wch:12},{wch:10},{wch:6},{wch:12},{wch:12},{wch:12}
   ];
 
   addBorders(ws);
@@ -2483,33 +2544,50 @@ document.getElementById('importFile').addEventListener('change', function(e) {
       // Collect all row data first (batch insert for performance)
       const newRowsData = [];
       let imported = 0;
+
+      // Map header names to column indices (compatible with both old and new files)
+      const HEADER_FIELD = {
+        '年份':'year','项目号':'projectNo','虚拟码':'virtualCode','合同号':'contractNo',
+        '设备名称':'equipName','型号':'model','补充型号':'subModel','属性':'attr',
+        '撬块归属':'blockOwner','工序':'process','设计备注':'designNote','数量':'qty',
+        '是否整机外购':'purchase','位置':'position','合同属性':'contractAttr','业务归属':'biz',
+        '责任部门':'dept','油漆':'paint','铭牌':'nameplate','条线':'line',
+        '主设备':'mainEquip','配套标识':'matchMark','特殊标记':'specialMark'
+      };
+      const headerRow = json[0] || [];
+      const colIdx = {};
+      headerRow.forEach((h, i) => { const f = HEADER_FIELD[String(h).trim()]; if (f) colIdx[f] = i; });
+      const getCell = (row, f) => (colIdx[f] != null && row[colIdx[f]] != null) ? row[colIdx[f]] : '';
+
       for (let i = 1; i < json.length; i++) {
         const row = json[i];
         if (!row || row.length === 0) continue;
         if (row.every(c => c == null || c === '')) continue;
 
         newRowsData.push({
-          year: row[1] || new Date().getFullYear(),
-          projectNo: row[2] || '',
-          virtualCode: row[3] || '',
-          contractNo: row[4] || '',
-          equipName: row[5] || '',
-          model: row[6] || '',
-          subModel: row[7] || '',
-          attr: row[8] || '',
-          blockOwner: row[9] || '',
-          process: row[10] || '',
-          designNote: row[11] || '',
-          qty: parseInt(row[12]) || 1,
-          purchase: row[13] || '否',
-          position: row[14] || '',
-          contractAttr: row[15] || 'RICH',
-          biz: row[16] || 'RICH',
-          dept: row[17] || '',
-          paint: row[18] || '',
-          nameplate: row[19] || '',
-          line: parseInt(row[20]) || '',
-          specialMark: row[21] || '',
+          year: getCell(row,'year') || new Date().getFullYear(),
+          projectNo: getCell(row,'projectNo') || '',
+          virtualCode: getCell(row,'virtualCode') || '',
+          contractNo: getCell(row,'contractNo') || '',
+          equipName: getCell(row,'equipName') || '',
+          model: getCell(row,'model') || '',
+          subModel: getCell(row,'subModel') || '',
+          attr: getCell(row,'attr') || '',
+          blockOwner: getCell(row,'blockOwner') || '',
+          process: getCell(row,'process') || '',
+          designNote: getCell(row,'designNote') || '',
+          qty: parseInt(getCell(row,'qty')) || 1,
+          purchase: getCell(row,'purchase') || '否',
+          position: getCell(row,'position') || '',
+          contractAttr: getCell(row,'contractAttr') || 'RICH',
+          biz: getCell(row,'biz') || 'RICH',
+          dept: getCell(row,'dept') || '',
+          paint: getCell(row,'paint') || '',
+          nameplate: getCell(row,'nameplate') || '',
+          line: parseInt(getCell(row,'line')) || '',
+          mainEquip: getCell(row,'mainEquip') || '',
+          matchMark: getCell(row,'matchMark') || '',
+          specialMark: getCell(row,'specialMark') || '',
         });
         imported++;
       }
@@ -2628,6 +2706,84 @@ document.getElementById('contractFile').addEventListener('change', function(e) {
   reader.readAsArrayBuffer(file);
   e.target.value = '';
 });
+
+// ========== Simulate contract numbers (fill empty only) ==========
+// 特殊标识 → 英文代码（规则见需求：出口F/医药Y/防爆EX/有毒D/精细化工-EC，电控硬件-EE/上位机-SE 以 "-" 连接）
+const SMARK_BASE_CODE = {
+  '出口': 'F',
+  '医药': 'Y',
+  '防爆': 'EX',
+  '有毒': 'D',
+  '精细化工': '-EC',
+  '出口精细化工': 'F-EC'
+};
+const SMARK_SUFFIX_CODE = { '电控硬件': 'EE', '上位机': 'SE' };
+
+function smarkToCode(sm) {
+  let s = String(sm == null ? '' : sm).trim();
+  if (!s || s === '普通') return '';
+  let suffix = '';
+  for (const k in SMARK_SUFFIX_CODE) {
+    if (s.endsWith(k)) { suffix = SMARK_SUFFIX_CODE[k]; s = s.slice(0, -k.length).trim(); break; }
+  }
+  const base = SMARK_BASE_CODE[s] || '';
+  if (base && suffix) return base + '-' + suffix;
+  return base || suffix;
+}
+
+function padNum(n, width) { return String(n).padStart(width, '0'); }
+function isEmptyContract(r) { return !r.contractNo || String(r.contractNo).trim() === ''; }
+
+function simulateContracts() {
+  const targets = rows.filter(isEmptyContract);
+  if (targets.length === 0) { showToast('没有空的合同号可模拟'); return; }
+
+  const now = new Date();
+  const yy = padNum(now.getFullYear() % 100, 2);   // 2位数年份
+  const mm = padNum(now.getMonth() + 1, 2);        // 2位数月份
+
+  // RICH：序列号「每条线一个」——按条线首次出现顺序分配 4 位号（仅统计 RICH 行，ROSS 行不占号）
+  const lineSerial = {};
+  let lineCount = 0;
+  rows.forEach(r => {
+    if (String(r.biz || '').trim().toUpperCase() === 'ROSS') return;
+    const key = String(r.line == null || r.line === '' ? '' : r.line).trim();
+    if (!(key in lineSerial)) lineSerial[key] = ++lineCount;
+  });
+  const lineOrder = {};   // RICH：顺序号每个条线独立累计（仅对本次补空的行计数）
+
+  pushHistory();
+  let rossSeq = 0, filled = 0;
+
+  targets.forEach(r => {
+    const code = smarkToCode(r.specialMark);
+    const biz = String(r.biz || '').trim().toUpperCase();
+    if (biz === 'ROSS') {
+      // ROSS：2位年 + 3位序列号 + 特殊标识代码
+      // 主设备有值 → 序列号递增，不加 -配套标识 后缀
+      // 主设备为空 + 配套标识不为空 → 序列号沿用上一个（不增加），加 -配套标识 后缀
+      const mk = String(r.matchMark == null ? '' : r.matchMark).trim();
+      const me = String(r.mainEquip == null ? '' : r.mainEquip).trim();
+      if (me === '' && mk !== '') {
+        const serial = rossSeq > 0 ? rossSeq : 1;
+        r.contractNo = yy + padNum(serial, 3) + code + '-' + mk;
+      } else {
+        rossSeq++;
+        r.contractNo = yy + padNum(rossSeq, 3) + code;
+      }
+    } else {
+      // RICH：2位年 + 2位月 + 4位序列号(每条线一个) + 特殊标识代码 + "-" + 顺序号(条线内累计)
+      const key = String(r.line == null || r.line === '' ? '' : r.line).trim();
+      const serial = lineSerial[key] || 1;
+      lineOrder[key] = (lineOrder[key] || 0) + 1;
+      r.contractNo = yy + mm + padNum(serial, 4) + code + '-' + lineOrder[key];
+    }
+    filled++;
+  });
+
+  render();
+  showToast(`已模拟生成 ${filled} 个合同号（仅填充空白）`);
+}
 
 function clearContracts() {
   const count = rows.filter(r => r.contractNo && String(r.contractNo).trim() !== '').length;
