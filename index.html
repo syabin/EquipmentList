@@ -693,6 +693,7 @@ table.hide-nonessential .col-nameplate {
       </div>
       <input type="file" id="contractFile" accept=".xlsx,.xls,.csv" style="display:none">
     </div>
+    <button class="btn btn-outline" onclick="autoNumberMatch()" title="按主设备=1分组，自动给每组的配套标识编序号（独立设备主设备=0不参与）">🔢 自动编号</button>
     <label class="btn btn-outline" title="导入已有设备清单">
       📥 导入
       <input type="file" id="importFile" accept=".xlsx,.xls" style="display:none">
@@ -2475,7 +2476,11 @@ function saveExcel() {
 
   const data = [headers];
   rows.forEach((r, i) => {
-    data.push([i + 1, ...fields.map(f => r[f] ?? '')]);
+    data.push([i + 1, ...fields.map(f => {
+    let v = r[f] ?? '';
+    if (f === 'mainEquip' && String(v).trim() === '0') v = '';
+    return v;
+  })]);
   });
 
   const ws = XLSX.utils.aoa_to_sheet(data);
@@ -2511,7 +2516,11 @@ function exportExcel() {
 
   const data = [headers];
   rows.forEach((r, i) => {
-    data.push([i + 1, ...fields.map(f => r[f] ?? '')]);
+    data.push([i + 1, ...fields.map(f => {
+    let v = r[f] ?? '';
+    if (f === 'mainEquip' && String(v).trim() === '0') v = '';
+    return v;
+  })]);
   });
 
   const ws = XLSX.utils.aoa_to_sheet(data);
@@ -2733,6 +2742,38 @@ function smarkToCode(sm) {
 
 function padNum(n, width) { return String(n).padStart(width, '0'); }
 function isEmptyContract(r) { return !r.contractNo || String(r.contractNo).trim() === ''; }
+
+function autoNumberMatch() {
+  if (rows.length === 0) { showToast('没有数据可编号'); return; }
+  pushHistory();
+  let groupNo = 0;
+  let inGroup = false;
+  let subNo = 0;   // 组内序号：每组独立，从 1 开始依次增加
+  rows.forEach(r => {
+    const me = String(r.mainEquip == null ? '' : r.mainEquip).trim();
+    if (me === '1') {
+      // 组起点：主设备=1，组内序号重置
+      groupNo++;
+      inGroup = true;
+      subNo = 0;
+      r.matchMark = '1';
+    } else if (me === '') {
+      // 配套行：主设备留空，组内序号从 1 依次增加
+      if (inGroup) {
+        subNo++;
+        r.matchMark = String(subNo);
+      } else {
+        r.matchMark = '';
+      }
+    } else {
+      // 主设备=0（或其他非空值）：独立设备，打断组，配套标识清空
+      r.matchMark = '';
+      inGroup = false;
+    }
+  });
+  render();
+  showToast(`已自动编号 ${groupNo} 组`);
+}
 
 function simulateContracts() {
   const targets = rows.filter(isEmptyContract);
