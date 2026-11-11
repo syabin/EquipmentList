@@ -19,6 +19,7 @@
   --border: #e2e8f0;
   --text: #1e293b;
   --text-secondary: #64748b;
+  --text-muted: #94a3b8;
   --row-hover: #f0f9ff;
   --row-selected: #dbeafe;
   --row-min-height: 36px;
@@ -621,31 +622,94 @@ table.hide-nonessential .col-nameplate {
   background: var(--border);
   margin: 4px 0;
 }
-/* 存档系统样式 */
-.archive-overlay{position:fixed;inset:0;background:rgba(0,0,0,0.3);z-index:150;display:none;align-items:flex-start;justify-content:center;padding-top:60px}
+/* ========== 存档系统 v2（搜索 / 排序 / 批量 / 分页 / 撤回 / 云同步） ========== */
+.archive-overlay{position:fixed;inset:0;background:rgba(15,23,42,0.38);z-index:150;display:none;align-items:flex-start;justify-content:center;padding-top:40px}
 .archive-overlay.show{display:flex}
-.archive-panel{background:var(--card);border-radius:8px;width:520px;max-width:90vw;max-height:70vh;display:flex;flex-direction:column;box-shadow:0 8px 30px rgba(0,0,0,0.15);border:1px solid var(--border)}
-.archive-header{padding:10px 16px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between}
-.archive-header h3{font-size:14px;font-weight:600;margin:0}
+.archive-panel{background:var(--card);border-radius:10px;width:760px;max-width:94vw;max-height:86vh;display:flex;flex-direction:column;box-shadow:0 18px 50px rgba(15,23,42,0.22);border:1px solid var(--border)}
+.archive-header{padding:12px 16px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;gap:8px}
+.archive-header h3{font-size:15px;font-weight:600;margin:0}
 .archive-header .btn{font-size:11px}
-.archive-body{flex:1;overflow-y:auto;padding:10px 16px;max-height:45vh}
-.archive-empty{text-align:center;padding:24px 16px;color:var(--text-muted)}
+.archive-toolbar{padding:10px 16px;display:flex;gap:8px;align-items:center;flex-wrap:wrap;border-bottom:1px solid var(--border)}
+.archive-toolbar input,.archive-toolbar select,.cloud-form input,.cloud-form select,.mini-panel input,.mini-panel textarea{padding:5px 8px;border:1px solid var(--border);border-radius:5px;font-size:12px;font-family:inherit;outline:none;background:#fff;color:var(--text)}
+.archive-toolbar input:focus,.archive-toolbar select:focus,.cloud-form input:focus,.mini-panel input:focus{border-color:var(--primary)}
+.archive-toolbar #archiveSearch{flex:1;min-width:160px}
+.archive-quota{font-size:11px;color:var(--text-secondary);margin-left:auto;white-space:nowrap}
+.archive-quota.warn{color:var(--warning);font-weight:600}
+.archive-bulkbar{padding:8px 16px;display:flex;gap:6px;align-items:center;flex-wrap:wrap;border-bottom:1px solid var(--border);background:#f8fafc}
+.archive-bulkbar label{font-size:11px;display:flex;align-items:center;gap:4px;cursor:pointer}
+.archive-bulkbar .btn{font-size:11px;padding:3px 8px}
+.archive-body{flex:1;overflow-y:auto;padding:10px 16px;min-height:130px}
+.archive-empty{text-align:center;padding:28px 16px;color:var(--text-muted)}
 .archive-empty .icon{font-size:32px;margin-bottom:8px}
-.archive-list{display:flex;flex-direction:column;gap:6px}
-.archive-item{background:#f8fafc;border:1px solid var(--border);border-radius:6px;padding:8px 10px;cursor:pointer;transition:all 0.12s}
-.archive-item:hover{border-color:var(--primary);background:var(--primary-light)}
-.archive-item-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:4px}
-.archive-item-name{font-size:12px;font-weight:600;color:var(--text)}
-.archive-item-time{font-size:10px;color:var(--text-muted)}
-.archive-item-meta{display:flex;gap:10px;font-size:10px;color:var(--text-secondary)}
-.archive-item-meta span{display:flex;align-items:center;gap:2px}
-.archive-item-actions{display:flex;gap:4px;margin-top:6px}
-.archive-item-actions .btn{font-size:10px;padding:2px 6px}
-.archive-save-form{padding:10px 16px;border-top:1px solid var(--border);background:#f8fafc;border-radius:0 0 8px 8px}
-.archive-save-row{display:flex;gap:4px;align-items:center}
-.archive-save-row input{flex:1;padding:4px 6px;border:1px solid var(--border);border-radius:4px;font-size:11px;font-family:inherit;outline:none}
+.archive-list{display:flex;flex-direction:column;gap:8px}
+.archive-item{background:#fff;border:1px solid var(--border);border-radius:7px;padding:9px 11px;display:flex;gap:10px;align-items:flex-start;transition:border-color 0.12s,background 0.12s}
+.archive-item:hover{border-color:var(--primary);background:var(--row-hover)}
+.archive-item.is-current{border-color:var(--primary);background:#eff6ff;box-shadow:inset 3px 0 0 var(--primary)}
+.archive-item.is-auto{background:#f8fafc}
+.archive-item-main{flex:1;min-width:0}
+.archive-item-header{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.archive-item-name{font-size:13px;font-weight:600;color:var(--text);word-break:break-all}
+.archive-item-time{font-size:10px;color:var(--text-muted);margin-left:auto;white-space:nowrap}
+.archive-badge{font-size:10px;padding:1px 6px;border-radius:10px;background:#eef2ff;color:#4f46e5;white-space:nowrap}
+.archive-badge.auto{background:#f1f5f9;color:#64748b}
+.archive-badge.import{background:#ecfdf5;color:#047857}
+.archive-badge.cloud{background:#eff6ff;color:#1d4ed8}
+.archive-item-note{font-size:11px;color:var(--text-secondary);margin-top:3px;word-break:break-all}
+.archive-item-meta{display:flex;gap:12px;flex-wrap:wrap;font-size:10px;color:var(--text-secondary);margin-top:6px}
+.archive-item-actions{display:flex;gap:4px;flex-wrap:wrap;margin-top:8px}
+.archive-item-actions .btn{font-size:10px;padding:2px 7px}
+.archive-item-check{margin-top:3px}
+.archive-pager{padding:8px 16px;display:flex;gap:6px;align-items:center;justify-content:center;border-top:1px solid var(--border);font-size:11px;color:var(--text-secondary)}
+.archive-pager .btn{font-size:11px;padding:2px 8px}
+.archive-save-form{padding:10px 16px;border-top:1px solid var(--border);background:#f8fafc;border-radius:0 0 10px 10px}
+.archive-save-row{display:flex;gap:6px;align-items:center}
+.archive-save-row input{flex:1;padding:5px 8px;border:1px solid var(--border);border-radius:5px;font-size:12px;font-family:inherit;outline:none}
 .archive-save-row input:focus{border-color:var(--primary)}
-.archive-save-row .btn{font-size:10px;padding:3px 6px}
+.archive-save-row #archiveName{flex:1.2}
+.archive-save-row .btn{font-size:11px;padding:4px 12px}
+.archive-hint{font-size:10px;color:var(--text-muted);margin-top:6px;line-height:1.6}
+
+/* ========== 云同步面板 ========== */
+.cloud-panel{width:720px}
+.cloud-body{padding:14px 16px;overflow-y:auto;flex:1}
+.cloud-form{display:flex;flex-direction:column;gap:10px}
+.cloud-form-row{display:flex;gap:10px;flex-wrap:wrap}
+.cloud-form-group{display:flex;flex-direction:column;gap:4px;min-width:150px;flex:1}
+.cloud-form-group label{font-size:11px;color:var(--text-secondary)}
+.cloud-form-group input,.cloud-form-group select{width:100%}
+.cloud-checks{display:flex;gap:16px;flex-wrap:wrap;font-size:12px;color:var(--text)}
+.cloud-checks label{display:flex;align-items:center;gap:5px;cursor:pointer}
+.cloud-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:4px}
+.cloud-actions .btn{font-size:12px;padding:5px 12px}
+.cloud-status{font-size:12px;color:var(--text-secondary);min-height:20px;padding:8px 10px;background:#f8fafc;border:1px solid var(--border);border-radius:6px;line-height:1.7}
+.cloud-status code{background:#eef2f7;padding:1px 4px;border-radius:3px;font-size:11px}
+.cloud-note{font-size:11px;color:var(--text-muted);line-height:1.7;margin-top:10px}
+.cloud-note code{background:#f1f5f9;padding:1px 4px;border-radius:3px}
+.gh-auto-status{font-size:10px;color:#64748b;white-space:nowrap;flex-shrink:0}
+.gh-auto-status.err{color:#dc2626}
+.gh-auto-status.busy{color:#2563eb}
+
+/* ========== 通用弹窗 / 撤回提示 ========== */
+.mini-overlay{position:fixed;inset:0;background:rgba(15,23,42,0.38);z-index:220;display:none;align-items:center;justify-content:center;padding:20px}
+.mini-overlay.show{display:flex}
+.mini-panel{background:var(--card);border-radius:10px;width:460px;max-width:94vw;max-height:86vh;display:flex;flex-direction:column;box-shadow:0 18px 50px rgba(15,23,42,0.22);border:1px solid var(--border)}
+.mini-header{padding:12px 16px;border-bottom:1px solid var(--border);font-size:14px;font-weight:600}
+.mini-body{padding:16px;overflow-y:auto;font-size:13px;line-height:1.7;color:var(--text)}
+.mini-body p{margin-bottom:8px}
+.mini-body input,.mini-body textarea{width:100%;margin-top:4px}
+.mini-actions{padding:10px 16px;border-top:1px solid var(--border);display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap}
+.mini-actions .btn{font-size:12px;padding:5px 12px}
+.diff-grid{display:flex;gap:8px;flex-wrap:wrap;margin:10px 0}
+.diff-card{flex:1;min-width:100px;background:#f8fafc;border:1px solid var(--border);border-radius:6px;padding:8px;text-align:center;font-size:11px;color:var(--text-secondary)}
+.diff-card b{display:block;font-size:18px;color:var(--primary)}
+.diff-row{padding:6px 10px;border-left:3px solid #f59e0b;background:#fffbeb;margin-bottom:4px;font-size:12px;border-radius:4px}
+.undo-toast{position:fixed;left:50%;bottom:28px;transform:translateX(-50%);background:#1e293b;color:#fff;padding:10px 14px;border-radius:8px;box-shadow:0 10px 30px rgba(15,23,42,0.3);z-index:300;display:flex;gap:12px;align-items:center;font-size:12px;max-width:90vw}
+.undo-toast .btn{font-size:11px;padding:3px 10px}
+
+/* 表头批量按钮（工序列） */
+.th-batch-btn{border:none;background:transparent;color:var(--primary);font-size:11px;cursor:pointer;padding:0 2px;line-height:1;vertical-align:middle}
+.th-batch-btn:hover{text-decoration:underline}
+.th-batch-btn:focus{outline:1px solid var(--primary);border-radius:2px}
 
 /* 按钮分组 */
 .btn-group{display:flex;gap:0}
@@ -706,6 +770,8 @@ table.hide-nonessential .col-nameplate {
     <!-- File output -->
     <span id="autosaveTime" style="color:#94a3b8;font-size:10px;flex-shrink:0"></span>
     <button class="btn btn-warning" onclick="showArchivePanel()" title="项目存档管理">📁 存档</button>
+    <button class="btn btn-outline" onclick="showCloudPanel()" title="GitHub 云端同步（与任务管理器共用仓库）">☁ 云同步</button>
+    <span id="elGhAutoStatus" class="gh-auto-status" title=""></span>
     <button class="btn btn-success" onclick="saveExcel()">💾 保存</button>
     <button class="btn btn-outline" onclick="exportExcel()">📤 导出</button>
   </div>
@@ -783,7 +849,7 @@ table.hide-nonessential .col-nameplate {
         <th class="col-submodel">补充型号</th>
         <th class="col-attr">属性</th>
         <th class="col-block">撬块归属</th>
-        <th class="col-process">工序</th>
+        <th class="col-process">工序 <button class="th-batch-btn" onclick="openProcessBatch()" title="批量修改勾选行的工序（覆盖 / 仅填空 / 清空）">▾</button></th>
         <th class="col-note">设计备注</th>
         <th class="col-qty">数量</th>
         <th class="col-purchase">是否整机外购</th>
@@ -847,22 +913,91 @@ table.hide-nonessential .col-nameplate {
   <div class="archive-panel">
     <div class="archive-header">
       <h3>📁 项目存档</h3>
-      <button class="btn btn-outline btn-sm" onclick="closeArchivePanel()">关闭</button>
+      <div style="display:flex;gap:6px">
+        <button class="btn btn-outline" onclick="showCloudPanel()">☁ 云同步</button>
+        <button class="btn btn-outline" onclick="closeArchivePanel()">关闭</button>
+      </div>
+    </div>
+    <div class="archive-toolbar">
+      <input type="text" id="archiveSearch" placeholder="搜索名称 / 备注" oninput="onArchiveSearch()" autocomplete="off">
+      <select id="archiveSort" onchange="onArchiveSortChange()" title="排序方式">
+        <option value="time-desc">时间：新 → 旧</option>
+        <option value="time-asc">时间：旧 → 新</option>
+        <option value="name-asc">名称：A → Z</option>
+        <option value="rows-desc">行数：多 → 少</option>
+      </select>
+      <span class="archive-quota" id="archiveQuota"></span>
+    </div>
+    <div class="archive-bulkbar">
+      <label><input type="checkbox" id="archiveCheckAll" onchange="toggleArchiveSelectAll(this.checked)"> 全选本页</label>
+      <button class="btn btn-outline" onclick="exportSelectedArchives()">📤 导出选中</button>
+      <button class="btn btn-outline" onclick="deleteSelectedArchives()">🗑 删除选中</button>
+      <button class="btn btn-outline" onclick="purgeAutoArchives()">🧹 清理自动快照</button>
+      <button class="btn btn-outline" onclick="exportAllArchives()">导出全部</button>
+      <button class="btn btn-outline" onclick="document.getElementById('archiveImportFile').click()">📥 导入</button>
+      <input type="file" id="archiveImportFile" accept=".json" style="display:none" onchange="importArchives(event)">
     </div>
     <div class="archive-body" id="archiveBody"></div>
+    <div class="archive-pager" id="archivePager"></div>
     <div class="archive-save-form">
       <div class="archive-save-row">
-        <input type="text" id="archiveName" placeholder="输入项目名称或项目号">
-        <button class="btn btn-primary btn-sm" onclick="saveArchive()">保存</button>
+        <input type="text" id="archiveName" placeholder="输入项目名称或项目号" maxlength="60" autocomplete="off">
+        <input type="text" id="archiveNote" placeholder="备注（可选）" maxlength="120" autocomplete="off">
+        <button class="btn btn-primary" onclick="saveArchive()">保存</button>
       </div>
-      <div class="archive-save-row" style="margin-top:6px">
-        <button class="btn btn-outline btn-sm" onclick="exportAllArchives()">📤 导出</button>
-        <button class="btn btn-outline btn-sm" onclick="document.getElementById('archiveImportFile').click()">📥 导入</button>
-        <input type="file" id="archiveImportFile" accept=".json" style="display:none" onchange="importArchives(event)">
+      <div class="archive-hint">回车保存 · Esc 关闭 · 同名会询问「覆盖 / 另存」· 加载前自动留一份快照，删除可撤回 · 勾选后可批量导出/删除</div>
+    </div>
+  </div>
+</div>
+
+<!-- 云同步面板 -->
+<div class="archive-overlay" id="cloudOverlay">
+  <div class="archive-panel cloud-panel">
+    <div class="archive-header">
+      <h3>☁ GitHub 云端同步</h3>
+      <button class="btn btn-outline" onclick="closeCloudPanel()">关闭</button>
+    </div>
+    <div class="cloud-body">
+      <p class="cloud-note" style="margin-top:0">与任务管理器共用私有仓库 <code>syabin/task-data</code>，但数据放在另一个文件夹：<code>equipment-list/equipment-data.json</code>（任务管理器用 <code>data/task-data.json</code>），互不干扰。同步内容 = 当前工作区 + 项目存档 + 型号对照表 + 累计工时。</p>
+      <div class="cloud-form">
+        <div class="cloud-form-row">
+          <div class="cloud-form-group"><label>仓库（owner/repo）</label><input type="text" id="elGhRepo" value="syabin/task-data" autocomplete="off"></div>
+          <div class="cloud-form-group"><label>文件路径</label><input type="text" id="elGhPath" value="equipment-list/equipment-data.json" autocomplete="off"></div>
+          <div class="cloud-form-group" style="max-width:130px"><label>分支</label><input type="text" id="elGhBranch" value="main" autocomplete="off"></div>
+        </div>
+        <div class="cloud-form-row">
+          <div class="cloud-form-group"><label>访问令牌 (PAT)</label><input type="password" id="elGhToken" placeholder="ghp_… 或 fine-grained token" autocomplete="off"></div>
+        </div>
+        <div class="cloud-checks">
+          <label><input type="checkbox" id="elGhRemember" onchange="ghSaveConfig()"> 记住令牌（存本机浏览器）</label>
+          <label><input type="checkbox" id="elGhIncludeArchives" checked onchange="ghSaveConfig()"> 同步全部项目存档</label>
+          <label><input type="checkbox" id="elGhIncludeRef" checked onchange="ghSaveConfig()"> 同步型号对照表</label>
+          <label title="每次编辑保存后约 3 秒静默上传，不弹窗"><input type="checkbox" id="elGhAutoSync" onchange="ghSaveConfig(); ghOnAutoSyncToggle()"> 编辑后自动静默上传</label>
+        </div>
+        <div class="cloud-actions">
+          <button class="btn btn-outline" id="ghBtnTest" onclick="ghTestConn()">测试连接</button>
+          <button class="btn btn-primary" id="ghBtnUpload" onclick="ghUpload()">⬆ 上传到 GitHub</button>
+          <button class="btn btn-outline" id="ghBtnDiff" onclick="ghShowDiff()">🔍 对比云端差异</button>
+          <button class="btn btn-danger" id="ghBtnForce" onclick="ghForceUpload()">⚠ 强制覆盖上传</button>
+          <button class="btn btn-success" id="ghBtnPull" onclick="ghPull()">⬇ 从 GitHub 拉取</button>
+        </div>
+        <div class="cloud-status" id="ghStatus">尚未同步。</div>
+        <p class="cloud-note">令牌准备：GitHub → Settings → Developer settings → Personal access tokens → Fine-grained tokens，选中私有仓库 <code>task-data</code>，勾选 <code>Contents: Read and write</code>。令牌只存本机（默认不落盘，勾选「记住」才存），不会写进导出的存档文件。</p>
+        <p class="cloud-note">冲突策略：上传前比对上次同步的远端 <code>sha</code>，云端若已被其他设备改动则<b>拒绝覆盖</b>，先看差异再决定拉取或强制覆盖。拉取前本地会自动留一份快照。</p>
       </div>
     </div>
   </div>
 </div>
+
+<!-- 通用弹窗（选择 / 输入 / 差异对比） -->
+<div class="mini-overlay" id="miniOverlay">
+  <div class="mini-panel" id="miniPanel">
+    <div class="mini-header" id="miniTitle"></div>
+    <div class="mini-body" id="miniBody"></div>
+    <div class="mini-actions" id="miniActions"></div>
+  </div>
+</div>
+<div id="undoToastHost"></div>
 
 <script>
 // ========== Data ==========
@@ -899,6 +1034,7 @@ function pushHistory() {
   if (undoStack.length > MAX_HISTORY) undoStack.shift();
   redoStack = []; // new action clears redo
   updateUndoUI();
+  try { scheduleGhAutoSync(); } catch(e){} // 编辑后触发云端自动同步（3 秒静默合并）
 }
 
 function undo() {
@@ -952,6 +1088,8 @@ function autoSave() {
     saveTimerState();
     const el = document.getElementById('autosaveTime');
     if (el) el.textContent = '已暂存 ' + new Date().toLocaleTimeString('zh-CN');
+    try { maybeTimedAutoSnapshot(); } catch(e){}   // 定时自动留底（15 分钟 + 内容有变化）
+    try { scheduleGhAutoSync(); } catch(e){}       // 自动同步兜底
   } catch(e) {
     console.warn('自动暂存失败:', e);
   }
@@ -964,120 +1102,908 @@ function startAutoSave() {
   window.addEventListener('beforeunload', autoSave);
 }
 
-// ========== Archive System ==========
+// ========== Archive System v2 ==========
+// 优化点：写入失败保护 / 配额 / 加载前自动快照 / 删除撤回 / 同名处理 / 重命名备注 /
+// 搜索排序分页 / 批量导出删除 / 导入三策略与结构校验 / 事件委托 / 版本迁移 / 计时器恢复
 const ARCHIVE_KEY = 'deviceList_archives';
-function getArchives(){try{const s=localStorage.getItem(ARCHIVE_KEY);return s?JSON.parse(s):[]}catch(e){return[]}}
-function setArchives(arr){try{localStorage.setItem(ARCHIVE_KEY,JSON.stringify(arr))}catch(e){showToast('存档保存失败，可能存储空间不足')}}
+const ARCHIVE_VERSION = 2;
+const ARCHIVE_EXPORT_VERSION = 2;
+const ARCHIVE_MAX_BYTES = 4 * 1024 * 1024;      // localStorage 安全上限（约 5MB，留余量给暂存/对照表）
+const ARCHIVE_IMPORT_MAX_BYTES = 20 * 1024 * 1024;
+const ARCHIVE_AUTO_KEEP = 5;                     // 自动快照保留份数
+const ARCHIVE_PAGE_SIZE = 20;
+let archivePage = 1;
+let archiveQuery = '';
+let archiveSort = 'time-desc';
+let archiveSelected = new Set();
+let currentArchiveId = '';
+let lastAutoSnapshotAt = 0;
+let lastAutoSnapshotSig = '';
+
+function genArchiveId(){ return 'arch_' + Date.now() + '_' + Math.random().toString(36).slice(2,8); }
+function bytesOf(str){ try { return new TextEncoder().encode(str).length; } catch(e){ return String(str).length * 2; } }
+function formatBytes(n){ return n < 1024 ? n + ' B' : (n < 1048576 ? (n/1024).toFixed(1) + ' KB' : (n/1048576).toFixed(2) + ' MB'); }
+function safeName(s){ const t = String(s == null ? '' : s).trim(); return (t || '未命名存档').slice(0,60); }
+function escAttr(s){ return escHtml(s).replace(/'/g,'&#39;'); }
+function stampName(){ const d = new Date(), p = n => String(n).padStart(2,'0'); return '' + d.getFullYear() + p(d.getMonth()+1) + p(d.getDate()) + '_' + p(d.getHours()) + p(d.getMinutes()) + p(d.getSeconds()); }
+function safeFile(s){
+  let out = '';
+  for (const ch of String(s || '')) out += (/[a-zA-Z0-9_-]/.test(ch) || (ch >= '一' && ch <= '鿿')) ? ch : '_';
+  return out.slice(0,40) || '存档';
+}
+
+// 旧格式（v1）自动迁移 + 结构校验；坏数据直接丢弃，不污染列表
+function normalizeArchive(a){
+  if (!a || typeof a !== 'object' || !Array.isArray(a.rows)) return null;
+  const now = new Date();
+  const time = (a.time && !isNaN(new Date(a.time).getTime())) ? a.time : now.toISOString();
+  const item = {
+    id: a.id || genArchiveId(),
+    name: safeName(a.name),
+    note: String(a.note || '').slice(0,120),
+    time: time,
+    timeStr: a.timeStr || new Date(time).toLocaleString('zh-CN'),
+    rows: a.rows,
+    nextId: Number(a.nextId) || (a.rows.length + 1),
+    timerElapsed: Number(a.timerElapsed) || 0,
+    modelRef: Array.isArray(a.modelRef) ? a.modelRef : null,
+    kind: a.kind === 'auto' ? 'auto' : 'manual',
+    source: ['local','import','cloud'].indexOf(a.source) >= 0 ? a.source : 'local',
+    version: ARCHIVE_VERSION
+  };
+  item.size = Number(a.size) > 0 ? Number(a.size) : bytesOf(JSON.stringify(item));
+  return item;
+}
+function getArchives(){
+  try {
+    const s = localStorage.getItem(ARCHIVE_KEY);
+    if (!s) return [];
+    const arr = JSON.parse(s);
+    if (!Array.isArray(arr)) return [];
+    return arr.map(normalizeArchive).filter(Boolean);
+  } catch(e){ console.warn('存档读取失败:', e); return []; }
+}
+// 写入前算体积；写入失败绝不改动已落盘数据（旧实现会静默丢数据）
+function setArchives(arr){
+  try {
+    const str = JSON.stringify(arr);
+    if (bytesOf(str) > ARCHIVE_MAX_BYTES) {
+      showToast('存档库将超过 ' + formatBytes(ARCHIVE_MAX_BYTES) + ' 上限，请先删旧存档或导出备份');
+      return false;
+    }
+    localStorage.setItem(ARCHIVE_KEY, str);
+    updateArchiveQuota();
+    return true;
+  } catch(e){
+    showToast('存档保存失败（浏览器存储不足），原有存档未改动');
+    console.warn('存档写入失败:', e);
+    return false;
+  }
+}
+function updateArchiveQuota(){
+  const el = document.getElementById('archiveQuota');
+  if (!el) return;
+  let size = 0;
+  try { size = bytesOf(localStorage.getItem(ARCHIVE_KEY) || ''); } catch(e){}
+  const pct = Math.round(size / ARCHIVE_MAX_BYTES * 100);
+  el.textContent = '占用 ' + formatBytes(size) + ' / ' + formatBytes(ARCHIVE_MAX_BYTES) + '（' + pct + '%）';
+  el.className = 'archive-quota' + (pct >= 80 ? ' warn' : '');
+}
+
+function buildArchive(name, note, kind, source){
+  const now = new Date();
+  const item = {
+    id: genArchiveId(), name: safeName(name), note: String(note || '').slice(0,120),
+    time: now.toISOString(), timeStr: now.toLocaleString('zh-CN'),
+    rows: JSON.parse(JSON.stringify(rows)), nextId: nextId,
+    timerElapsed: getTimerTotal(),
+    modelRef: modelRef.length ? JSON.parse(JSON.stringify(modelRef)) : null,
+    kind: kind === 'auto' ? 'auto' : 'manual', source: source || 'local',
+    version: ARCHIVE_VERSION
+  };
+  item.size = bytesOf(JSON.stringify(item));
+  return item;
+}
+// 内容指纹：数据没变就不重复留自动快照
+function archiveSignature(){
+  const raw = rows.length + '|' + rows.map(r => [r.model,r.equipName,r.contractNo,r.qty,r.line].join('~')).join('|');
+  let h = 5381;
+  for (let i = 0; i < raw.length; i++) h = ((h << 5) + h + raw.charCodeAt(i)) | 0;
+  return h + ':' + raw.length;
+}
+function createAutoSnapshot(reason, force){
+  if (!rows.length) return null;
+  const sig = archiveSignature();
+  if (!force && sig === lastAutoSnapshotSig) return null;
+  const item = buildArchive('自动快照 · ' + (reason || '定时'), '系统自动留存：' + (reason || '定时') + '前的状态', 'auto', 'local');
+  const list = [item].concat(getArchives());
+  const keep = new Set(list.filter(a => a.kind === 'auto').slice(0, ARCHIVE_AUTO_KEEP).map(a => a.id));
+  const next = list.filter(a => a.kind !== 'auto' || keep.has(a.id));
+  if (!setArchives(next)) return null;
+  lastAutoSnapshotSig = sig;
+  lastAutoSnapshotAt = Date.now();
+  return item;
+}
+function maybeTimedAutoSnapshot(){
+  if (Date.now() - lastAutoSnapshotAt < 15 * 60 * 1000) return;
+  createAutoSnapshot('定时');
+}
+
+// ====== 面板 / 弹窗 ======
 function showArchivePanel(){
   document.getElementById('archiveOverlay').classList.add('show');
-  document.getElementById('archiveName').value='';
+  document.getElementById('archiveName').value = '';
+  document.getElementById('archiveNote').value = '';
+  archivePage = 1;
   renderArchiveList();
+  setTimeout(() => { const el = document.getElementById('archiveName'); if (el) el.focus(); }, 30);
 }
-function closeArchivePanel(){document.getElementById('archiveOverlay').classList.remove('show')}
-function saveArchive(){
-  const nameInput=document.getElementById('archiveName');
-  const name=nameInput.value.trim();
-  if(!name){showToast('请输入项目名称');nameInput.focus();return}
-  const archives=getArchives();
-  const now=new Date();
-  const archive={
-    id:'arch_'+now.getTime(),
-    name:name,
-    time:now.toISOString(),
-    timeStr:now.toLocaleString('zh-CN'),
-    rows:JSON.parse(JSON.stringify(rows)),
-    nextId:nextId,
-    timerElapsed:getTimerTotal(),
-    modelRef:modelRef.length>0?JSON.parse(JSON.stringify(modelRef)):null
+function closeArchivePanel(){ document.getElementById('archiveOverlay').classList.remove('show'); }
+function showCloudPanel(){ closeArchivePanel(); document.getElementById('cloudOverlay').classList.add('show'); ghLoadConfig(); }
+function closeCloudPanel(){ document.getElementById('cloudOverlay').classList.remove('show'); }
+function closeMiniModal(){ document.getElementById('miniOverlay').classList.remove('show'); }
+function openMiniModal(title, bodyHtml, actions, width){
+  document.getElementById('miniPanel').style.width = width || '460px';
+  document.getElementById('miniTitle').textContent = title;
+  document.getElementById('miniBody').innerHTML = bodyHtml;
+  const box = document.getElementById('miniActions');
+  box.innerHTML = '';
+  (actions || []).forEach(a => {
+    const b = document.createElement('button');
+    b.className = 'btn ' + (a.cls || 'btn-outline');
+    b.textContent = a.label;
+    b.onclick = () => { closeMiniModal(); if (a.onClick) a.onClick(); };
+    box.appendChild(b);
+  });
+  document.getElementById('miniOverlay').classList.add('show');
+}
+function showChoiceModal(title, msg, options){
+  openMiniModal(title, '<p style="white-space:pre-line">' + escHtml(msg) + '</p>', options);
+}
+function showPromptModal(title, fields, onOk){
+  let html = '';
+  fields.forEach(f => { html += '<p>' + escHtml(f.label) + '<input type="text" id="' + f.id + '" maxlength="' + (f.maxlength || 120) + '" value="' + escAttr(f.value || '') + '"></p>'; });
+  openMiniModal(title, html, [{ label:'取消', cls:'btn-outline' }, { label:'保存', cls:'btn-primary' }]);
+  const box = document.getElementById('miniActions');
+  box.lastChild.onclick = () => {
+    const vals = {};
+    fields.forEach(f => { const el = document.getElementById(f.id); vals[f.id] = el ? el.value : ''; });
+    if (onOk(vals) !== false) closeMiniModal();
   };
-  archives.unshift(archive);
-  setArchives(archives);
-  showToast('已保存存档: '+name);
-  renderArchiveList();
-  nameInput.value='';
+  const first = document.getElementById(fields[0].id);
+  if (first) { first.focus(); first.select(); }
 }
-function loadArchive(id){
-  const archives=getArchives();
-  const arch=archives.find(a=>a.id===id);
-  if(!arch){showToast('存档不存在');return}
-  showModal('加载存档','确定要加载存档 "'+arch.name+'" 吗？当前未保存的工作将被覆盖。',()=>{
-    pushHistory();
-    rows=JSON.parse(JSON.stringify(arch.rows));
-    nextId=arch.nextId||rows.length+1;
-    if(arch.modelRef)modelRef=JSON.parse(JSON.stringify(arch.modelRef));
-    render();
-    autoSave();
-    closeArchivePanel();
-    showToast('已加载存档: '+arch.name);
-  })
+function showUndoToast(msg, undoFn){
+  const host = document.getElementById('undoToastHost');
+  if (!host) { showToast(msg); return; }
+  host.innerHTML = '';
+  const box = document.createElement('div');
+  box.className = 'undo-toast';
+  const span = document.createElement('span'); span.textContent = msg;
+  const btn = document.createElement('button'); btn.className = 'btn btn-warning'; btn.textContent = '↩ 撤回';
+  const close = document.createElement('button'); close.className = 'btn btn-outline'; close.textContent = '关闭';
+  const dismiss = () => { clearTimeout(timer); host.innerHTML = ''; };
+  btn.onclick = () => { dismiss(); undoFn(); };
+  close.onclick = dismiss;
+  box.appendChild(span); box.appendChild(btn); box.appendChild(close);
+  host.appendChild(box);
+  const timer = setTimeout(dismiss, 8000);
 }
-function deleteArchive(id,name){
-  showModal('删除存档','确定要删除存档 "'+name+'" 吗？此操作不可恢复。',()=>{
-    const archives=getArchives().filter(a=>a.id!==id);
-    setArchives(archives);
-    renderArchiveList();
-    showToast('已删除存档: '+name);
-  })
+
+// ====== 保存 / 覆盖 / 复制 / 编辑 ======
+function clearArchiveForm(){
+  const n = document.getElementById('archiveName'), t = document.getElementById('archiveNote');
+  if (n) n.value = ''; if (t) t.value = '';
 }
-function renderArchiveList(){
-  const body=document.getElementById('archiveBody');
-  const archives=getArchives();
-  if(archives.length===0){
-    body.innerHTML='<div class="archive-empty"><div class="icon">📭</div><div>暂无存档</div><div style="font-size:12px;margin-top:8px">在下方输入项目名称保存当前配置</div></div>';
+function saveArchive(){
+  const nameInput = document.getElementById('archiveName');
+  const noteInput = document.getElementById('archiveNote');
+  const name = (nameInput.value || '').trim();
+  if (!name) { showToast('请输入项目名称'); nameInput.focus(); return; }
+  const note = (noteInput.value || '').trim();
+  const same = getArchives().find(a => a.name === name && a.kind !== 'auto');
+  if (same) {
+    showChoiceModal('同名存档已存在', '已有名为「' + name + '」的存档（' + same.timeStr + '）。请选择处理方式：', [
+      { label:'覆盖更新', cls:'btn-primary', onClick: () => doSaveArchive(name, note, same.id) },
+      { label:'另存为新存档', cls:'btn-outline', onClick: () => doSaveArchive(name + ' (2)', note) },
+      { label:'取消', cls:'btn-outline', onClick: () => {} }
+    ]);
     return;
   }
-  let h='<div class="archive-list">';
-  archives.forEach(arch=>{
-    const rowCount=arch.rows?arch.rows.length:0;
-    h+='<div class="archive-item">';
-    h+='<div class="archive-item-header">';
-    h+='<span class="archive-item-name">'+escHtml(arch.name)+'</span>';
-    h+='<span class="archive-item-time">'+escHtml(arch.timeStr)+'</span>';
-    h+='</div>';
-    h+='<div class="archive-item-meta">';
-    h+='<span>📋 '+rowCount+' 条记录</span>';
-    h+='<span>'+(arch.modelRef?'✅ 含对照表':'无对照表')+'</span>';
-    h+='</div>';
-    h+='<div class="archive-item-actions">';
-    h+='<button class="btn btn-primary btn-sm" onclick="loadArchive(\''+arch.id+'\')">加载</button>';
-    h+='<button class="btn btn-danger btn-sm" onclick="deleteArchive(\''+arch.id+'\',\''+escHtml(arch.name).replace(/'/g,"\\'")+'\')">删除</button>';
-    h+='</div>';
-    h+='</div>';
-  });
-  h+='</div>';
-  body.innerHTML=h;
+  doSaveArchive(name, note);
 }
-function exportAllArchives(){
-  const archives=getArchives();
-  if(archives.length===0){showToast('暂无存档可导出');return}
-  const data={version:1,exportTime:new Date().toISOString(),archives:archives};
-  const blob=new Blob([JSON.stringify(data,null,2)],{type:'application/json'});
-  const url=URL.createObjectURL(blob);
-  const a=document.createElement('a');
-  a.href=url;a.download='设备清单存档_'+new Date().toISOString().slice(0,10)+'.json';
-  a.click();URL.revokeObjectURL(url);
-  showToast('已导出 '+archives.length+' 个存档');
+function doSaveArchive(name, note, overwriteId){
+  const archives = getArchives();
+  const item = buildArchive(name, note, 'manual', 'local');
+  let next;
+  if (overwriteId) {
+    const idx = archives.findIndex(a => a.id === overwriteId);
+    if (idx < 0) { showToast('原存档不存在，已改为新建'); next = [item].concat(archives); }
+    else {
+      // 覆盖时未填备注则沿用原备注，避免误清空
+      if (!note) item.note = archives[idx].note || '';
+      item.id = overwriteId; next = archives.slice(); next[idx] = item;
+    }
+  } else next = [item].concat(archives);
+  if (!setArchives(next)) return;
+  currentArchiveId = item.id;
+  clearArchiveForm();
+  renderArchiveList();
+  showToast((overwriteId ? '已覆盖更新存档: ' : '已保存存档: ') + name);
+  scheduleGhAutoSync();
+}
+function editArchiveMeta(id){
+  const arch = getArchives().find(a => a.id === id);
+  if (!arch) return;
+  showPromptModal('编辑存档信息', [
+    { label:'名称', value: arch.name, id:'mArchName', maxlength:60 },
+    { label:'备注', value: arch.note, id:'mArchNote', maxlength:120 }
+  ], vals => {
+    const name = (vals.mArchName || '').trim();
+    if (!name) { showToast('名称不能为空'); return false; }
+    const list = getArchives();
+    const t = list.find(a => a.id === id);
+    if (!t) return true;
+    t.name = safeName(name); t.note = String(vals.mArchNote || '').slice(0,120);
+    t.size = bytesOf(JSON.stringify(t));
+    if (setArchives(list)) { renderArchiveList(); showToast('存档信息已更新'); scheduleGhAutoSync(); }
+    return true;
+  });
+}
+function duplicateArchive(id){
+  const list = getArchives();
+  const src = list.find(a => a.id === id);
+  if (!src) return;
+  const copy = JSON.parse(JSON.stringify(src));
+  copy.id = genArchiveId(); copy.name = safeName(src.name + ' 副本');
+  copy.kind = 'manual'; copy.source = 'local';
+  const now = new Date(); copy.time = now.toISOString(); copy.timeStr = now.toLocaleString('zh-CN');
+  copy.size = bytesOf(JSON.stringify(copy));
+  list.unshift(copy);
+  if (!setArchives(list)) return;
+  renderArchiveList();
+  showToast('已复制为: ' + copy.name);
+  scheduleGhAutoSync();
+}
+
+// ====== 加载 / 删除 / 撤回 ======
+function loadArchive(id){
+  const arch = getArchives().find(a => a.id === id);
+  if (!arch) { showToast('存档不存在'); return; }
+  const diff = '当前 ' + rows.length + ' 行 → 存档 ' + arch.rows.length + ' 行' + (arch.modelRef ? '（含 ' + arch.modelRef.length + ' 个对照表型号）' : '');
+  showModal('加载存档', '确定加载「' + arch.name + '」吗？' + diff + '。加载前会自动留一份当前状态快照，可随时回退。', () => {
+    const snap = createAutoSnapshot('加载「' + arch.name + '」前', true);
+    pushHistory();
+    rows = JSON.parse(JSON.stringify(arch.rows));
+    nextId = arch.nextId || rows.length + 1;
+    if (arch.modelRef) {
+      modelRef = JSON.parse(JSON.stringify(arch.modelRef));
+      try { localStorage.setItem(REF_CACHE_KEY, JSON.stringify(modelRef)); localStorage.setItem(REF_CACHE_TIME_KEY, new Date().toISOString()); } catch(e){}
+      updateRefStatus('loaded', '存档自带对照表');
+    }
+    timerPause();
+    timerElapsed = arch.timerElapsed || 0;
+    updateTimerDisplay(); saveTimerState();
+    redoStack = [];
+    filterText = '';
+    const fi = document.getElementById('filterInput'); if (fi) fi.value = '';
+    const tw = document.querySelector('.table-wrapper'); if (tw) tw.scrollTop = 0;
+    currentArchiveId = arch.id;
+    render(); autoSave(); renderArchiveList(); closeArchivePanel();
+    showToast('已加载存档: ' + arch.name + (snap ? '（已自动留底）' : ''));
+  }, null, '确认加载');
+}
+function deleteArchive(id){
+  const arch = getArchives().find(a => a.id === id);
+  if (!arch) return;
+  showModal('删除存档', '确定删除「' + arch.name + '」吗？删除后 8 秒内可点提示条「撤回」恢复。', () => {
+    const cur = getArchives();
+    const i = cur.findIndex(a => a.id === id);
+    if (i < 0) return;
+    const removed = cur.splice(i,1)[0];
+    if (!setArchives(cur)) return;
+    archiveSelected.delete(id);
+    if (currentArchiveId === id) currentArchiveId = '';
+    renderArchiveList();
+    showUndoToast('已删除存档: ' + removed.name, () => {
+      const list = getArchives();
+      if (list.some(a => a.id === removed.id)) return;
+      list.splice(Math.min(i, list.length), 0, removed);
+      if (setArchives(list)) { renderArchiveList(); showToast('已恢复存档: ' + removed.name); }
+    });
+    scheduleGhAutoSync();
+  }, null, '确认删除');
+}
+function deleteSelectedArchives(){
+  const ids = Array.from(archiveSelected);
+  if (!ids.length) { showToast('请先勾选要删除的存档'); return; }
+  showModal('批量删除', '确定删除勾选的 ' + ids.length + ' 个存档吗？删除后 8 秒内可撤回。', () => {
+    const cur = getArchives();
+    const removed = cur.filter(a => archiveSelected.has(a.id));
+    const keep = cur.filter(a => !archiveSelected.has(a.id));
+    if (!setArchives(keep)) return;
+    archiveSelected.clear();
+    renderArchiveList();
+    showUndoToast('已删除 ' + removed.length + ' 个存档', () => {
+      const list = getArchives();
+      removed.forEach(r => { if (!list.some(x => x.id === r.id)) list.push(r); });
+      list.sort((a,b) => new Date(b.time) - new Date(a.time));
+      if (setArchives(list)) { renderArchiveList(); showToast('已恢复 ' + removed.length + ' 个存档'); }
+    });
+    scheduleGhAutoSync();
+  }, null, '确认删除');
+}
+function purgeAutoArchives(){
+  const n = getArchives().filter(a => a.kind === 'auto').length;
+  if (!n) { showToast('没有自动快照'); return; }
+  showModal('清理自动快照', '确定删除全部 ' + n + ' 个自动快照吗？手动存档不受影响，删除后 8 秒内可撤回。', () => {
+    const cur = getArchives();
+    const removed = cur.filter(a => a.kind === 'auto');
+    if (!setArchives(cur.filter(a => a.kind !== 'auto'))) return;
+    removed.forEach(a => archiveSelected.delete(a.id));
+    renderArchiveList();
+    showUndoToast('已清理 ' + removed.length + ' 个自动快照', () => {
+      const list = getArchives();
+      removed.forEach(a => { if (!list.some(x => x.id === a.id)) list.push(a); });
+      list.sort((a,b) => new Date(b.time) - new Date(a.time));
+      if (setArchives(list)) { renderArchiveList(); showToast('已恢复自动快照'); }
+    });
+    scheduleGhAutoSync();
+  }, null, '确认清理');
+}
+
+// ====== 导出 / 导入 ======
+function downloadJson(data, filename){
+  const blob = new Blob([JSON.stringify(data,null,2)], { type:'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = filename; document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+function exportArchives(list, single){
+  if (!list.length) { showToast('暂无存档可导出'); return; }
+  const data = { app:'EquipmentList', version:ARCHIVE_EXPORT_VERSION, exportTime:new Date().toISOString(), archives:list };
+  const fn = '设备清单存档_' + stampName() + (single ? '_' + safeFile(list[0].name) : '') + '.json';
+  downloadJson(data, fn);
+  showToast('已导出 ' + list.length + ' 个存档');
+}
+function exportAllArchives(){ exportArchives(getArchives(), false); }
+function exportSelectedArchives(){ exportArchives(getArchives().filter(a => archiveSelected.has(a.id)), false); }
+function exportOneArchive(id){
+  const a = getArchives().find(x => x.id === id);
+  if (!a) { showToast('存档不存在'); return; }
+  exportArchives([a], true);
 }
 function importArchives(e){
-  const file=e.target.files[0];if(!file)return;
-  const reader=new FileReader();
-  reader.onload=function(ev){
-    try{
-      const data=JSON.parse(ev.target.result);
-      if(!data||!Array.isArray(data.archives)){showToast('文件格式无效');return}
-      const existing=getArchives();
-      const existingIds=new Set(existing.map(a=>a.id));
-      let added=0;
-      data.archives.forEach(arch=>{
-        if(!existingIds.has(arch.id)){existing.push(arch);added++}
-      });
-      setArchives(existing);
-      renderArchiveList();
-      showToast('导入完成，新增 '+added+' 个存档');
-    }catch(err){showToast('导入失败: '+err.message)}
+  const file = e.target.files[0];
+  if (!file) return;
+  if (file.size > ARCHIVE_IMPORT_MAX_BYTES) { showToast('导入文件超过 20MB，已中止'); e.target.value = ''; return; }
+  const reader = new FileReader();
+  reader.onload = function(ev){
+    let data;
+    try { data = JSON.parse(ev.target.result); }
+    catch(err){ showToast('导入失败：不是合法 JSON'); e.target.value = ''; return; }
+    const incoming = Array.isArray(data) ? data : (data && Array.isArray(data.archives) ? data.archives : null);
+    if (!incoming) { showToast('文件格式无效（缺少 archives 数组）'); e.target.value = ''; return; }
+    const valid = incoming.map(normalizeArchive).filter(Boolean);
+    if (!valid.length) { showToast('文件中没有可用存档（结构校验未通过）'); e.target.value = ''; return; }
+    showChoiceModal('导入 ' + valid.length + ' 个存档', '检测到 ' + valid.length + ' 个有效存档，跳过 ' + (incoming.length - valid.length) + ' 个损坏项。同 id 的存档如何处理？', [
+      { label:'覆盖同 id', cls:'btn-primary', onClick: () => doImportArchives(valid, 'overwrite') },
+      { label:'保留两者（换新 id）', cls:'btn-outline', onClick: () => doImportArchives(valid, 'new') },
+      { label:'跳过重复', cls:'btn-outline', onClick: () => doImportArchives(valid, 'skip') },
+      { label:'取消', cls:'btn-outline', onClick: () => {} }
+    ]);
+    e.target.value = '';
   };
+  reader.onerror = () => { showToast('导入失败：文件读取错误'); e.target.value = ''; };
   reader.readAsText(file);
-  e.target.value='';
+}
+function doImportArchives(list, mode){
+  const existing = getArchives();
+  let added = 0, updated = 0, skipped = 0;
+  list.forEach(a => {
+    const item = JSON.parse(JSON.stringify(a));
+    item.source = 'import';
+    if (item.kind === 'auto') item.kind = 'manual';
+    const i = existing.findIndex(x => x.id === item.id);
+    if (i >= 0) {
+      if (mode === 'skip') { skipped++; return; }
+      if (mode === 'new') { item.id = genArchiveId(); existing.unshift(item); added++; return; }
+      existing[i] = item; updated++; return;
+    }
+    item.id = item.id || genArchiveId();
+    existing.unshift(item); added++;
+  });
+  existing.sort((a,b) => new Date(b.time) - new Date(a.time));
+  if (!setArchives(existing)) return;
+  renderArchiveList();
+  showToast('导入完成：新增 ' + added + ' · 覆盖 ' + updated + ' · 跳过 ' + skipped);
+  scheduleGhAutoSync();
+}
+
+// ====== 搜索 / 排序 / 分页 / 渲染（事件委托，不再拼 onclick） ======
+function onArchiveSearch(){ archiveQuery = (document.getElementById('archiveSearch').value || '').trim().toLowerCase(); archivePage = 1; renderArchiveList(); }
+function onArchiveSortChange(){ archiveSort = document.getElementById('archiveSort').value; archivePage = 1; renderArchiveList(); }
+function gotoArchivePage(p){ archivePage = p; renderArchiveList(); const b = document.getElementById('archiveBody'); if (b) b.scrollTop = 0; }
+function filteredArchives(){
+  let arr = getArchives();
+  if (archiveQuery) arr = arr.filter(a => (a.name + ' ' + (a.note || '')).toLowerCase().indexOf(archiveQuery) >= 0);
+  if (archiveSort === 'time-asc') arr.sort((a,b) => new Date(a.time) - new Date(b.time));
+  else if (archiveSort === 'name-asc') arr.sort((a,b) => a.name.localeCompare(b.name, 'zh-CN'));
+  else if (archiveSort === 'rows-desc') arr.sort((a,b) => b.rows.length - a.rows.length);
+  else arr.sort((a,b) => new Date(b.time) - new Date(a.time));
+  return arr;
+}
+function archiveVisible(arr){
+  const pages = Math.max(1, Math.ceil(arr.length / ARCHIVE_PAGE_SIZE));
+  archivePage = Math.min(Math.max(1, archivePage), pages);
+  return arr.slice((archivePage - 1) * ARCHIVE_PAGE_SIZE, archivePage * ARCHIVE_PAGE_SIZE);
+}
+function toggleArchiveSelectAll(on){
+  archiveVisible(filteredArchives()).forEach(a => on ? archiveSelected.add(a.id) : archiveSelected.delete(a.id));
+  renderArchiveList();
+}
+function onArchiveBodyClick(e){
+  const el = e.target.closest('[data-act]');
+  if (!el) return;
+  const act = el.dataset.act, id = el.dataset.id;
+  if (act === 'select') { el.checked ? archiveSelected.add(id) : archiveSelected.delete(id); return; }
+  if (act === 'load') loadArchive(id);
+  else if (act === 'edit') editArchiveMeta(id);
+  else if (act === 'copy') duplicateArchive(id);
+  else if (act === 'export') exportOneArchive(id);
+  else if (act === 'delete') deleteArchive(id);
+}
+function renderArchivePager(total){
+  const el = document.getElementById('archivePager');
+  if (!el) return;
+  const pages = Math.max(1, Math.ceil(total / ARCHIVE_PAGE_SIZE));
+  el.innerHTML = '共 ' + total + ' 个 · 第 ' + archivePage + '/' + pages + ' 页' +
+    ' <button class="btn btn-outline" onclick="gotoArchivePage(1)"' + (archivePage <= 1 ? ' disabled' : '') + '>首页</button>' +
+    ' <button class="btn btn-outline" onclick="gotoArchivePage(' + (archivePage-1) + ')"' + (archivePage <= 1 ? ' disabled' : '') + '>上一页</button>' +
+    ' <button class="btn btn-outline" onclick="gotoArchivePage(' + (archivePage+1) + ')"' + (archivePage >= pages ? ' disabled' : '') + '>下一页</button>' +
+    ' <button class="btn btn-outline" onclick="gotoArchivePage(' + pages + ')"' + (archivePage >= pages ? ' disabled' : '') + '>末页</button>';
+}
+function renderArchiveList(){
+  const body = document.getElementById('archiveBody');
+  if (!body) return;
+  updateArchiveQuota();
+  const all = getArchives();
+  const arr = filteredArchives();
+  if (!arr.length) {
+    body.innerHTML = '<div class="archive-empty"><div class="icon">📭</div><div>' + (all.length ? '没有匹配的存档' : '暂无存档') + '</div><div style="font-size:12px;margin-top:8px">' + (all.length ? '换个关键词试试' : '在下方输入项目名称保存当前配置') + '</div></div>';
+    const pg = document.getElementById('archivePager'); if (pg) pg.innerHTML = '';
+    return;
+  }
+  let h = '<div class="archive-list">';
+  archiveVisible(arr).forEach(arch => {
+    const sel = archiveSelected.has(arch.id);
+    const size = arch.size || bytesOf(JSON.stringify(arch));
+    const badge = arch.kind === 'auto' ? '<span class="archive-badge auto">🤖 自动</span>' :
+      (arch.source === 'import' ? '<span class="archive-badge import">导入</span>' :
+       (arch.source === 'cloud' ? '<span class="archive-badge cloud">云端</span>' : ''));
+    const isCur = currentArchiveId === arch.id;
+    h += '<div class="archive-item' + (isCur ? ' is-current' : '') + (arch.kind === 'auto' ? ' is-auto' : '') + '">';
+    h += '<input class="archive-item-check" type="checkbox" data-act="select" data-id="' + escAttr(arch.id) + '"' + (sel ? ' checked' : '') + ' title="勾选以批量操作">';
+    h += '<div class="archive-item-main">';
+    h += '<div class="archive-item-header"><span class="archive-item-name">' + escHtml(arch.name) + '</span>' + badge + (isCur ? '<span class="archive-badge">当前</span>' : '') + '<span class="archive-item-time">' + escHtml(arch.timeStr) + '</span></div>';
+    if (arch.note) h += '<div class="archive-item-note">📝 ' + escHtml(arch.note) + '</div>';
+    h += '<div class="archive-item-meta">';
+    h += '<span>📋 ' + arch.rows.length + ' 行</span>';
+    h += '<span>' + (arch.modelRef ? '✅ ' + arch.modelRef.length + ' 个型号' : '无对照表') + '</span>';
+    h += '<span>💾 ' + formatBytes(size) + '</span>';
+    h += '<span>⏱ ' + formatTime(arch.timerElapsed || 0) + '</span>';
+    h += '<span>v' + (arch.version || 1) + '</span>';
+    h += '</div>';
+    h += '<div class="archive-item-actions">';
+    h += '<button class="btn btn-primary" data-act="load" data-id="' + escAttr(arch.id) + '">加载</button>';
+    h += '<button class="btn btn-outline" data-act="edit" data-id="' + escAttr(arch.id) + '">✎ 编辑</button>';
+    h += '<button class="btn btn-outline" data-act="copy" data-id="' + escAttr(arch.id) + '">⧉ 复制</button>';
+    h += '<button class="btn btn-outline" data-act="export" data-id="' + escAttr(arch.id) + '">📤 导出</button>';
+    h += '<button class="btn btn-danger" data-act="delete" data-id="' + escAttr(arch.id) + '">删除</button>';
+    h += '</div></div></div>';
+  });
+  h += '</div>';
+  body.innerHTML = h;
+  renderArchivePager(arr.length);
+}
+function initArchiveSystem(){
+  const body = document.getElementById('archiveBody');
+  if (body) body.addEventListener('click', onArchiveBodyClick);
+  ['archiveName','archiveNote'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); saveArchive(); } });
+  });
+  document.getElementById('archiveOverlay').addEventListener('click', e => { if (e.target.id === 'archiveOverlay') closeArchivePanel(); });
+  document.getElementById('cloudOverlay').addEventListener('click', e => { if (e.target.id === 'cloudOverlay') closeCloudPanel(); });
+  document.getElementById('miniOverlay').addEventListener('click', e => { if (e.target.id === 'miniOverlay') closeMiniModal(); });
+  lastAutoSnapshotAt = Date.now();
+  lastAutoSnapshotSig = archiveSignature();
+  ghLoadConfig();
+  renderArchiveList();
+  if (ghAutoSyncEnabled()) {
+    ghRestoreAutoStatus();
+    const s = ghGetSync();
+    // 本地有未同步改动时，强制首轮自动上传一次；否则直接判定为已同步
+    _ghLastSyncedFingerprint = (s.sha && s.localHash === ghLocalFingerprint()) ? ghLocalFingerprint() : '';
+    scheduleGhAutoSync();
+  }
+}
+
+// ========== GitHub 云端同步（Contents API） ==========
+// 与 TaskManager 同款：仓库 syabin/task-data，但数据放在 equipment-list/ 文件夹，
+// 与任务管理器的 data/task-data.json 互不干扰。含 PAT、sha 冲突保护、差异对比、自动静默上传。
+const EL_GH_CONFIG_KEY = 'el-gh-config';
+const EL_GH_TOKEN_KEY = 'el-gh-token';
+const EL_GH_SYNC_KEY = 'el-gh-sync';
+const GH_API = 'https://api.github.com';
+let _ghTokenMemory = '';
+let _ghAutoTimer = null;
+let _ghAutoBusy = false;
+let _ghSuppressAuto = false;
+let _ghLastSyncedFingerprint = '';
+
+function ghVal(id){ const el = document.getElementById(id); return el ? String(el.value || '').trim() : ''; }
+function ghChecked(id){ const el = document.getElementById(id); return !!(el && el.checked); }
+function ghConfig(){
+  return {
+    repo: ghVal('elGhRepo') || 'syabin/task-data',
+    path: ghVal('elGhPath') || 'equipment-list/equipment-data.json',
+    branch: ghVal('elGhBranch') || 'main',
+    includeArchives: ghChecked('elGhIncludeArchives'),
+    includeRef: ghChecked('elGhIncludeRef'),
+    autoSync: ghChecked('elGhAutoSync'),
+    remember: ghChecked('elGhRemember')
+  };
+}
+function ghSaveConfig(){
+  try {
+    const cfg = ghConfig();
+    localStorage.setItem(EL_GH_CONFIG_KEY, JSON.stringify(cfg));
+    const typed = ghVal('elGhToken');
+    if (cfg.remember && typed) { localStorage.setItem(EL_GH_TOKEN_KEY, typed); _ghTokenMemory = ''; }
+    else { localStorage.removeItem(EL_GH_TOKEN_KEY); _ghTokenMemory = typed; }
+  } catch(e){}
+}
+function ghLoadConfig(){
+  let cfg = {};
+  try { cfg = JSON.parse(localStorage.getItem(EL_GH_CONFIG_KEY) || '{}'); } catch(e){}
+  const fill = (id, def) => { const el = document.getElementById(id); if (el) el.value = cfg[id] || def; };
+  fill('elGhRepo', 'syabin/task-data');
+  fill('elGhPath', 'equipment-list/equipment-data.json');
+  fill('elGhBranch', 'main');
+  const chk = (id, def) => { const el = document.getElementById(id); if (el) el.checked = cfg[id] === undefined ? def : !!cfg[id]; };
+  chk('elGhIncludeArchives', true);
+  chk('elGhIncludeRef', true);
+  chk('elGhAutoSync', false);
+  let tok = '';
+  try { tok = localStorage.getItem(EL_GH_TOKEN_KEY) || ''; } catch(e){}
+  const t = document.getElementById('elGhToken'); if (t) t.value = tok;
+  const r = document.getElementById('elGhRemember'); if (r) r.checked = !!tok;
+  updateGhStatus();
+  if (ghAutoSyncEnabled()) ghRestoreAutoStatus(); else ghSetAutoStatus('', '');
+}
+function ghGetToken(){ return ghVal('elGhToken') || _ghTokenMemory || ''; }
+function ghGetSync(){ try { return JSON.parse(localStorage.getItem(EL_GH_SYNC_KEY) || '{}'); } catch(e){ return {}; } }
+function ghSetSync(o){ try { localStorage.setItem(EL_GH_SYNC_KEY, JSON.stringify(o)); } catch(e){} }
+
+// 云端数据 = 当前工作区 + 项目存档 + 对照表 + 累计工时
+function buildCloudData(withMeta){
+  const cfg = ghConfig();
+  const data = {
+    app: 'EquipmentList', version: 2,
+    rows: rows, nextId: nextId, timerElapsed: getTimerTotal(),
+    modelRef: (cfg.includeRef && modelRef.length) ? modelRef : null,
+    archives: cfg.includeArchives ? getArchives() : null
+  };
+  if (withMeta) data.exportTime = new Date().toISOString();
+  return data;
+}
+// 本地指纹（不含时间戳，避免每次都判定为"有改动"）
+function ghLocalFingerprint(){
+  const raw = JSON.stringify(buildCloudData(false));
+  let h = 5381;
+  for (let i = 0; i < raw.length; i++) h = ((h << 5) + h + raw.charCodeAt(i)) | 0;
+  return h + ':' + raw.length;
+}
+function validateCloudData(obj){
+  if (!obj || !Array.isArray(obj.rows)) throw new Error('远端文件结构异常（缺少 rows 数组），已中止覆盖');
+  if (obj.archives != null && !Array.isArray(obj.archives)) throw new Error('远端存档库结构异常，已中止覆盖');
+  if (obj.modelRef != null && !Array.isArray(obj.modelRef)) throw new Error('远端对照表结构异常，已中止覆盖');
+}
+// 拉取覆盖：先留本地自动快照，再一次性替换所有状态
+function applyCloudData(obj){
+  validateCloudData(obj);
+  const cfg = ghConfig();
+  const snap = createAutoSnapshot('云端拉取前', true);
+  if (!snap) showToast('未能留取拉取前快照（本地存档空间不足），请谨慎继续');
+  _ghSuppressAuto = true;
+  try {
+    rows = JSON.parse(JSON.stringify(obj.rows));
+    nextId = Number(obj.nextId) || rows.length + 1;
+    timerPause();
+    timerElapsed = Number(obj.timerElapsed) || 0;
+    updateTimerDisplay(); saveTimerState();
+    if (obj.modelRef && cfg.includeRef) {
+      modelRef = JSON.parse(JSON.stringify(obj.modelRef));
+      try { localStorage.setItem(REF_CACHE_KEY, JSON.stringify(modelRef)); localStorage.setItem(REF_CACHE_TIME_KEY, new Date().toISOString()); } catch(e){}
+      updateRefStatus('loaded', '云端对照表');
+    }
+    if (Array.isArray(obj.archives) && cfg.includeArchives) {
+      const list = obj.archives.map(normalizeArchive).filter(Boolean);
+      // 云端存档库整体覆盖本地，但保留刚生成的「拉取前」本地快照，确保随时可回退
+      if (snap && !list.some(a => a.id === snap.id)) list.unshift(snap);
+      if (!setArchives(list)) throw new Error('本地存档库写入失败（空间不足），已停止覆盖存档库');
+      currentArchiveId = '';
+    }
+    redoStack = [];
+    filterText = '';
+    const fi = document.getElementById('filterInput'); if (fi) fi.value = '';
+    const tw = document.querySelector('.table-wrapper'); if (tw) tw.scrollTop = 0;
+    render(); autoSave(); renderArchiveList();
+  } finally { _ghSuppressAuto = false; }
+}
+
+function setGhStatus(html){ const el = document.getElementById('ghStatus'); if (el) el.innerHTML = html; }
+function setGhBusy(busy){
+  ['ghBtnTest','ghBtnUpload','ghBtnPull','ghBtnDiff','ghBtnForce'].forEach(id => {
+    const el = document.getElementById(id); if (el) el.disabled = busy;
+  });
+}
+function updateGhStatus(){
+  const s = ghGetSync();
+  if (!s.syncedAt) { setGhStatus('尚未同步。点击「⬆ 上传到 GitHub」建立首次同步。'); return; }
+  const dirty = s.localHash !== ghLocalFingerprint();
+  setGhStatus('上次同步：' + escAttr(new Date(s.syncedAt).toLocaleString('zh-CN')) +
+    ' · 远端 sha <code>' + escAttr((s.sha || '').slice(0,7)) + '</code> · ' +
+    (dirty ? '<span style="color:#f59e0b;font-weight:600;">本地有未同步改动</span>'
+           : '<span style="color:#16a34a;">本地与上次同步一致</span>'));
+}
+function handleGhError(e){
+  if (e && e.message === 'NO_TOKEN') {
+    setGhStatus('<span style="color:#dc2626;">请先填写访问令牌 (PAT)。</span>');
+    showToast('请先填写访问令牌 (PAT)'); return;
+  }
+  if (e && e.message === 'NETWORK') {
+    setGhStatus('<span style="color:#dc2626;">网络请求失败：' + escAttr(e.detail || '') + '（离线无法同步）</span>');
+    showToast('网络请求失败，无法同步'); return;
+  }
+  const msg = (e && e.message) || '未知错误';
+  setGhStatus('<span style="color:#dc2626;">失败：' + escAttr(msg) + '</span>');
+  showToast('同步失败：' + msg);
+}
+function ghB64Encode(str){
+  const bytes = new TextEncoder().encode(str);
+  let bin = '';
+  for (let i = 0; i < bytes.length; i++) bin += String.fromCharCode(bytes[i]);
+  return btoa(bin);
+}
+function ghB64Decode(b64){ return new TextDecoder().decode(Uint8Array.from(atob(String(b64 || '').replace(/\s/g, '')), c => c.charCodeAt(0))); }
+async function ghApi(method, url, body){
+  const token = ghGetToken();
+  if (!token) throw new Error('NO_TOKEN');
+  const headers = { 'Authorization':'Bearer ' + token, 'Accept':'application/vnd.github+json', 'X-GitHub-Api-Version':'2022-11-28' };
+  if (body) headers['Content-Type'] = 'application/json';
+  let resp;
+  try { resp = await fetch(url, { method:method, headers:headers, body: body ? JSON.stringify(body) : undefined }); }
+  catch(e){ const err = new Error('NETWORK'); err.detail = (e && e.message) || '网络请求失败'; throw err; }
+  let json = null;
+  try { json = await resp.json(); } catch(e){}
+  if (!resp.ok) {
+    const code = resp.status;
+    let msg = (json && json.message) || ('HTTP ' + code);
+    if (code === 401) msg = '令牌无效或已过期（401）';
+    else if (code === 403) msg = '权限不足或被限流（403）：私有仓库需授予 Contents 读写权限';
+    else if (code === 404) msg = '仓库或文件不存在（404）：请检查仓库名与文件路径';
+    else if (code === 409) msg = '远端文件已存在且缺少 sha（409）';
+    else if (code === 422) msg = '提交被拒绝（422）：内容或分支有误';
+    const err = new Error(msg); err.status = code; throw err;
+  }
+  return json;
+}
+function ghFileUrl(cfg, query){
+  const enc = String(cfg.path).split('/').filter(Boolean).map(encodeURIComponent).join('/');
+  return GH_API + '/repos/' + cfg.repo + '/contents/' + enc + (query || '');
+}
+async function ghFetchRemote(){
+  const cfg = ghConfig();
+  const j = await ghApi('GET', ghFileUrl(cfg, '?ref=' + encodeURIComponent(cfg.branch)));
+  return { sha: j.sha, text: ghB64Decode(j.content || '') };
+}
+async function ghTestConn(){
+  ghSaveConfig();
+  const cfg = ghConfig();
+  setGhBusy(true); setGhStatus('正在测试连接…');
+  try {
+    const repo = await ghApi('GET', GH_API + '/repos/' + cfg.repo);
+    let extra = '';
+    try { const r = await ghFetchRemote(); extra = '，数据文件 sha ' + r.sha.slice(0,7); }
+    catch(e){ if (e.status !== 404) throw e; extra = '，远端暂无数据文件'; }
+    setGhStatus('<span style="color:#16a34a;">连接正常：' + escAttr(repo.full_name) + '（' + (repo.private ? '私有' : '公开') + '）' + escAttr(extra) + '</span>');
+    showToast('GitHub 连接正常');
+  } catch(e){ handleGhError(e); }
+  finally { setGhBusy(false); }
+}
+async function ghUpload(opts){
+  const silent = !!(opts && opts.silent);
+  const force = !!(opts && opts.force);
+  const cfg = ghConfig();
+  if (!silent && !force && !confirm('确定把当前数据上传到 ' + cfg.repo + ' 的 ' + cfg.path + '（分支 ' + cfg.branch + '）？')) return { ok:false, reason:'cancelled' };
+  ghSaveConfig(); setGhBusy(true); setGhStatus('正在检查远端状态…');
+  try {
+    let remote = null;
+    try { remote = await ghFetchRemote(); } catch(e){ if (e.status !== 404) throw e; }
+    const sync = ghGetSync();
+    if (!force && remote && sync.sha && sync.sha !== remote.sha) {
+      setGhStatus('<span style="color:#dc2626;font-weight:600;">检测到冲突，已拒绝覆盖（远端已被其他设备改动）</span>');
+      if (!silent) alert('检测到冲突，已拒绝覆盖。本机上次同步的远端 sha：' + (sync.sha || '').slice(0,7) + '；远端当前 sha：' + remote.sha.slice(0,7) + '。请先点「🔍 对比云端差异」，再决定采纳云端（拉取）或以本地为准（强制覆盖上传）。');
+      return { ok:false, reason:'conflict' };
+    }
+    if (remote && !sync.sha && !force) {
+      if (silent) return { ok:false, reason:'need-confirm' };
+      if (!confirm('远端已存在数据文件，但本机没有同步记录（可能由其他设备上传）。继续将用本地数据覆盖远端，确定吗？')) return { ok:false, reason:'cancelled' };
+    } else if (!remote && sync.sha && !force) {
+      if (silent) return { ok:false, reason:'need-confirm' };
+      if (!confirm('远端数据文件已不存在（可能被删除），将重新创建。确定吗？')) return { ok:false, reason:'cancelled' };
+    }
+    setGhStatus('正在上传…' + (force ? '（强制覆盖）' : '') + '…');
+    const body = {
+      message: 'chore(sync): 更新设备清单数据 ' + new Date().toLocaleString('zh-CN'),
+      content: ghB64Encode(JSON.stringify(buildCloudData(true), null, 2)),
+      branch: cfg.branch
+    };
+    if (remote) body.sha = remote.sha;
+    const res = await ghApi('PUT', ghFileUrl(cfg), body);
+    const newSha = (res.content && res.content.sha) || (remote && remote.sha);
+    ghSetSync({ sha:newSha, syncedAt:new Date().toISOString(), localHash:ghLocalFingerprint() });
+    setGhStatus('<span style="color:#16a34a;">' + (force ? '强制覆盖成功' : '上传成功') + '，远端 sha <code>' + escAttr((newSha || '').slice(0,7)) + '</code> · ' + rows.length + ' 行 / ' + getArchives().length + ' 个存档</span>');
+    if (silent) return { ok:true, sha:newSha };
+    showToast('已上传到 GitHub');
+    updateGhStatus();
+    _ghLastSyncedFingerprint = ghLocalFingerprint();
+    if (ghAutoSyncEnabled()) ghRestoreAutoStatus();
+    return { ok:true, sha:newSha };
+  } catch(e){ handleGhError(e); return { ok:false, reason:'error', error:e }; }
+  finally { setGhBusy(false); }
+}
+async function ghPull(){
+  const cfg = ghConfig();
+  if (!confirm('从 ' + cfg.repo + ' 的 ' + cfg.path + ' 拉取并覆盖本地数据（含当前工作区、工时' + (cfg.includeArchives ? '、项目存档库' : '') + (cfg.includeRef ? '、型号对照表' : '') + '）？拉取前会自动留一份本地快照。')) return;
+  ghSaveConfig(); setGhBusy(true); setGhStatus('正在拉取远端数据…');
+  _ghSuppressAuto = true;
+  try {
+    let remote;
+    try { remote = await ghFetchRemote(); }
+    catch(e){ if (e.status === 404) throw new Error('远端还没有数据文件，请先上传'); throw e; }
+    let obj;
+    try { obj = JSON.parse(remote.text); } catch(e){ throw new Error('远端文件不是合法 JSON，已中止覆盖'); }
+    validateCloudData(obj);
+    applyCloudData(obj);
+    ghSetSync({ sha:remote.sha, syncedAt:new Date().toISOString(), localHash:ghLocalFingerprint() });
+    setGhStatus('<span style="color:#16a34a;">拉取成功，本地数据已替换（拉取前状态已自动留底）· ' + escAttr(cfg.path) + '</span>');
+    showToast('已从 GitHub 拉取并覆盖本地数据');
+    updateGhStatus();
+    _ghLastSyncedFingerprint = ghLocalFingerprint();
+    ghRestoreAutoStatus();
+  } catch(e){ handleGhError(e); }
+  finally { _ghSuppressAuto = false; setGhBusy(false); }
+}
+function computeDataDiff(local, remote){
+  const L = new Map((local.rows || []).map(r => [String(r.id), r]));
+  const R = new Map((remote.rows || []).map(r => [String(r.id), r]));
+  const fields = [['model','型号'],['equipName','设备名称'],['contractNo','合同号'],['projectNo','项目号'],['qty','数量'],['line','条线'],['attr','属性'],['dept','责任部门']];
+  let added = 0, removed = 0, changed = 0;
+  const samples = [];
+  L.forEach((r, id) => {
+    if (!R.has(id)) { added++; return; }
+    const x = R.get(id);
+    const diff = fields.filter(f => String(r[f[0]] || '') !== String(x[f[0]] || '')).map(f => f[1]);
+    if (diff.length) {
+      changed++;
+      if (samples.length < 8) samples.push(escHtml(String(r.equipName || r.model || ('行' + id))) + ' · ' + escHtml(diff.join('、')));
+    }
+  });
+  R.forEach((r, id) => { if (!L.has(id)) removed++; });
+  return {
+    added:added, removed:removed, changed:changed, samples:samples,
+    archivesLocal:(local.archives || []).length, archivesRemote:(remote.archives || []).length,
+    refLocal:(local.modelRef || []).length, refRemote:(remote.modelRef || []).length
+  };
+}
+function diffCard(v, label){ return '<div class="diff-card"><b>' + escHtml(String(v)) + '</b>' + escHtml(label) + '</div>'; }
+async function ghShowDiff(){
+  const cfg = ghConfig();
+  setGhStatus('正在对比云端差异…');
+  let remote;
+  try { remote = await ghFetchRemote(); }
+  catch(e){
+    if (e.status === 404) {
+      openMiniModal('云端差异对比', '<p>远端还没有数据文件，本地有 <b>' + rows.length + '</b> 行。直接点「⬆ 上传到 GitHub」即可创建。</p>', [{ label:'关闭', cls:'btn-outline' }]);
+      setGhStatus('远端还没有数据文件'); return;
+    }
+    handleGhError(e); return;
+  }
+  let obj;
+  try { obj = JSON.parse(remote.text); }
+  catch(e){ showToast('远端文件不是合法 JSON，无法对比'); setGhStatus('远端文件解析失败'); return; }
+  const d = computeDataDiff(buildCloudData(false), obj);
+  const sync = ghGetSync();
+  const conflict = !!(sync.sha && sync.sha !== remote.sha);
+  let html = '<p style="font-size:12px;color:var(--text-muted)">仓库 ' + escAttr(cfg.repo) + ' · ' + escAttr(cfg.path) + ' · 分支 ' + escAttr(cfg.branch) + '</p>';
+  if (conflict) html += '<div class="diff-row">⚠ 云端已被其他设备改动（本机 sha ' + escAttr((sync.sha || '').slice(0,7)) + ' → 云端 ' + escAttr((remote.sha || '').slice(0,7)) + '），普通上传会拒绝覆盖。</div>';
+  html += '<div class="diff-grid">' + diffCard(d.added, '本地新增行') + diffCard(d.removed, '云端独有行') + diffCard(d.changed, '内容有差异') +
+          diffCard(d.archivesLocal + ' / ' + d.archivesRemote, '存档 本地/云端') + diffCard(d.refLocal + ' / ' + d.refRemote, '型号 本地/云端') + '</div>';
+  html += d.samples.length ? d.samples.map(s => '<div class="diff-row">' + s + '</div>').join('') : '<p>本地与云端没有行级差异。</p>';
+  openMiniModal('云端差异对比', html, [
+    { label:'关闭', cls:'btn-outline' },
+    { label:'⬇ 采纳云端（覆盖本地）', cls:'btn-outline', onClick: () => ghPull() },
+    { label:'⚠ 强制覆盖上传', cls:'btn-danger', onClick: () => ghForceUpload() }
+  ], '760px');
+  setGhStatus('差异对比完成');
+}
+async function ghForceUpload(){
+  const cfg = ghConfig();
+  if (!confirm('确定强制覆盖云端数据？仓库：' + cfg.repo + '；文件：' + cfg.path + '（分支 ' + cfg.branch + '）。云端当前内容将被本地完全替换，建议先对比差异。')) return;
+  setGhBusy(true);
+  try {
+    const res = await ghUpload({ force:true });
+    if (res && res.ok) { _ghLastSyncedFingerprint = ghLocalFingerprint(); if (ghAutoSyncEnabled()) ghRestoreAutoStatus(); }
+  } finally { setGhBusy(false); }
+}
+
+// ====== 自动静默同步（编辑后 3 秒合并一次） ======
+function ghAutoSyncEnabled(){ return ghChecked('elGhAutoSync'); }
+function ghSetAutoStatus(text, cls, title){
+  const el = document.getElementById('elGhAutoStatus');
+  if (!el) return;
+  el.textContent = text || '';
+  el.className = 'gh-auto-status' + (cls ? ' ' + cls : '');
+  el.title = title || '';
+}
+function ghRestoreAutoStatus(){
+  const s = ghGetSync();
+  if (!s.syncedAt) return;
+  ghSetAutoStatus(rows.length + ' 行已同步至云端', '',
+    '最近同步：' + new Date(s.syncedAt).toLocaleString('zh-CN') + '；数据文件：' + ghConfig().path + '；' + rows.length + ' 行 · ' + getArchives().length + ' 个存档');
+}
+function scheduleGhAutoSync(){
+  if (!ghAutoSyncEnabled() || _ghSuppressAuto || _ghAutoBusy) return;
+  if (_ghAutoTimer) clearTimeout(_ghAutoTimer);
+  _ghAutoTimer = setTimeout(() => { _ghAutoTimer = null; runGhAutoSync(); }, 3000);
+}
+async function runGhAutoSync(){
+  if (_ghAutoBusy || _ghSuppressAuto || !ghAutoSyncEnabled()) return;
+  const fp = ghLocalFingerprint();
+  if (fp === _ghLastSyncedFingerprint) return;
+  if (!ghGetToken()) { ghSetAutoStatus('自动同步待填写令牌', 'err', '请到「☁ 云同步」填写访问令牌 (PAT)'); return; }
+  _ghAutoBusy = true;
+  ghSetAutoStatus('正在同步至云端…', 'busy');
+  try {
+    const res = await ghUpload({ silent:true });
+    if (res && res.ok) {
+      _ghLastSyncedFingerprint = ghLocalFingerprint();
+      ghSetAutoStatus(rows.length + ' 行已同步至云端', '',
+        '最近同步：' + new Date().toLocaleString('zh-CN') + '；数据文件：' + ghConfig().path + '；' + rows.length + ' 行 · ' + getArchives().length + ' 个存档');
+    } else if (res && res.reason === 'conflict') {
+      ghSetAutoStatus('云端有改动，自动同步已暂停', 'err', '其他设备改动了云端数据，请到「☁ 云同步」手动处理');
+    } else if (res && res.reason === 'need-confirm') {
+      ghSetAutoStatus('首次同步需手动确认', 'err', '云端已有数据但本机没有同步记录，请手动上传一次');
+    } else if (res && res.reason === 'error') {
+      ghSetAutoStatus('自动同步失败', 'err', (res.error && res.error.message) || '未知错误');
+    }
+  } catch(e){ ghSetAutoStatus('自动同步失败', 'err', (e && e.message) || '未知错误'); }
+  finally { _ghAutoBusy = false; }
+}
+function ghOnAutoSyncToggle(){
+  ghSaveConfig();
+  if (!ghAutoSyncEnabled()) { ghSetAutoStatus('', ''); return; }
+  if (!ghGetToken()) {
+    ghSetAutoStatus('请先填写访问令牌 (PAT)', 'err', '自动同步需要令牌');
+    showToast('请先填写访问令牌 (PAT)'); return;
+  }
+  ghSetAutoStatus('已开启自动同步', 'busy', '每次编辑保存后约 3 秒静默上传');
+  _ghLastSyncedFingerprint = '';
+  scheduleGhAutoSync();
 }
 
 // ========== Timer ==========
@@ -1458,9 +2384,8 @@ function showModal(title, msg, onConfirm, onCancel, confirmText) {
   document.getElementById('modalOverlay').classList.add('show');
   document.getElementById('modalConfirm').onclick = () => { closeModal(); onConfirm(); };
   const cancelBtn = document.querySelector('.modal-actions .btn-outline');
-  if (cancelBtn && onCancel) {
-    cancelBtn.onclick = () => { closeModal(); onCancel(); };
-  }
+  // 每次都重设，避免沿用上一次弹窗的 onCancel（旧实现会重复触发初始化流程）
+  if (cancelBtn) cancelBtn.onclick = () => { closeModal(); if (onCancel) onCancel(); };
 }
 function closeModal() {
   document.getElementById('modalOverlay').classList.remove('show');
@@ -1716,6 +2641,60 @@ let clipboard = null; // {type:'rows'|'tsv', data: [...]}
 let lastFocusedRowId = null;
 let lastFocusedField = null;
 
+// ========== 工序批量修改（勾选多行后一次改） ==========
+// 入口：表头「工序 ▾」。三种模式：覆盖全部 / 仅填空 / 清空；支持常用值快捷填入、Ctrl+Z 撤销、云同步。
+function openProcessBatch(){
+  const selected = rows.filter(r => r.selected);
+  const recent = Array.from(new Set(rows.map(r => String(r.process || '').trim()).filter(Boolean))).slice(0,12);
+  let html = '<p>已勾选 <b>' + selected.length + '</b> 行' + (selected.length ? '' : '（请先勾选表格左侧的复选框）') + '</p>';
+  html += '<p>工序值<input type="text" id="mProcessVal" maxlength="60" placeholder="输入工序，如：装配 / 调试"></p>';
+  html += '<p>应用方式<select id="mProcessMode" style="width:100%"><option value="overwrite">覆盖所有勾选行</option><option value="fill">仅填充空白工序</option><option value="clear">清空工序</option></select></p>';
+  if (recent.length) {
+    html += '<p style="font-size:11px;color:var(--text-secondary);margin-top:10px">表中已有值（点击填入）：</p><div id="mProcessChips" style="display:flex;gap:6px;flex-wrap:wrap">';
+    recent.forEach(v => { html += '<button type="button" class="btn btn-outline" data-pv="' + escAttr(v) + '" style="font-size:11px;padding:2px 8px">' + escHtml(v) + '</button>'; });
+    html += '</div>';
+  }
+  html += '<p style="font-size:11px;color:var(--text-muted);margin-top:10px">修改会进入撤销历史（Ctrl+Z 可回退），并触发云端自动同步。</p>';
+  openMiniModal('批量修改工序', html, [{ label:'取消', cls:'btn-outline' }, { label:'应用', cls:'btn-primary' }]);
+  const box = document.getElementById('miniActions');
+  box.lastChild.onclick = () => applyProcessBatch();
+  const chips = document.getElementById('mProcessChips');
+  if (chips) chips.addEventListener('click', e => {
+    const b = e.target.closest('[data-pv]');
+    if (b) {
+      const input = document.getElementById('mProcessVal');
+      input.value = b.dataset.pv;
+      input.focus();
+    }
+  });
+  const input = document.getElementById('mProcessVal');
+  if (input) {
+    input.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); applyProcessBatch(); } });
+    setTimeout(() => input.focus(), 30);
+  }
+}
+function applyProcessBatch(){
+  const input = document.getElementById('mProcessVal');
+  const modeEl = document.getElementById('mProcessMode');
+  const val = input ? String(input.value || '').trim() : '';
+  const mode = modeEl ? modeEl.value : 'overwrite';
+  const selected = rows.filter(r => r.selected);
+  if (!selected.length) { showToast('请先勾选要修改的行'); return false; }
+  if (mode !== 'clear' && !val) { showToast('请输入工序值，或选择「清空工序」'); return false; }
+  pushHistory();
+  let n = 0;
+  selected.forEach(r => {
+    if (mode === 'clear') { if (String(r.process || '') !== '') { r.process = ''; n++; } }
+    else if (mode === 'fill') { if (!String(r.process || '').trim()) { r.process = val; n++; } }
+    else if (String(r.process || '') !== val) { r.process = val; n++; }
+  });
+  closeMiniModal();
+  render();
+  showToast(n ? '已批量修改工序：' + n + ' 行（Ctrl+Z 可撤销）' : '勾选行的工序无需改动');
+  scheduleGhAutoSync();
+  return true;
+}
+
 // Track which cell was last focused
 function bindEvents() {
   document.querySelectorAll('.cell-input').forEach(input => {
@@ -1737,8 +2716,8 @@ function bindEvents() {
       pushHistory();
       row[field] = newVal;
 
-      // Batch fill: position, line, paint, nameplate, year, projectNo apply to all selected rows
-      if ((field === 'position' || field === 'line' || field === 'paint' || field === 'nameplate' || field === 'year' || field === 'projectNo') && row.selected) {
+      // Batch fill: position, line, paint, nameplate, year, projectNo, process apply to all selected rows
+      if ((field === 'position' || field === 'line' || field === 'paint' || field === 'nameplate' || field === 'year' || field === 'projectNo' || field === 'process') && row.selected) {
         const selectedRows = rows.filter(r => r.selected && r.id !== id);
         if (selectedRows.length > 0) {
           selectedRows.forEach(r => { r[field] = newVal; });
@@ -1749,7 +2728,7 @@ function bindEvents() {
               if (el) el.value = newVal || '';
             }
           });
-          const labels = { position:'位置', line:'条线', paint:'油漆', nameplate:'铭牌', year:'年份', projectNo:'项目号' };
+          const labels = { position:'位置', line:'条线', paint:'油漆', nameplate:'铭牌', year:'年份', projectNo:'项目号', process:'工序' };
           showToast(`已批量填写 ${labels[field]}（${selectedRows.length + 1} 行）`);
         }
       }
@@ -2248,6 +3227,22 @@ document.addEventListener('click', e => {
 
 // ========== Keyboard shortcuts ==========
 document.addEventListener('keydown', e => {
+  // Escape 逐层关闭：确认框 → 通用弹窗 → 存档/云同步面板
+  if (e.key === 'Escape') {
+    hideCtxMenu(); hideAutocomplete();
+    const mo = document.getElementById('modalOverlay');
+    const mi = document.getElementById('miniOverlay');
+    if (mo && mo.classList.contains('show')) {
+      const cancel = document.querySelector('.modal-actions .btn-outline');
+      if (cancel) cancel.click(); else closeModal();
+      return;
+    }
+    if (mi && mi.classList.contains('show')) { closeMiniModal(); return; }
+    closeArchivePanel(); closeCloudPanel();
+    return;
+  }
+  // 存档 / 云同步 / 通用弹窗内的输入不触发表格快捷键
+  if (e.target && e.target.closest && e.target.closest('#archiveOverlay, #cloudOverlay, #miniOverlay')) return;
   // Ctrl+C: copy
   if ((e.ctrlKey || e.metaKey) && e.key === 'c') {
     // Only intercept if focus is inside the table
@@ -2286,11 +3281,6 @@ document.addEventListener('keydown', e => {
         showToast('已剪切 1 行');
       }
     }
-  }
-  // Escape: close menus
-  if (e.key === 'Escape') {
-    hideCtxMenu();
-    hideAutocomplete();
   }
   // Ctrl+Z: undo
   if ((e.ctrlKey || e.metaKey) && e.key === 'z' && !e.shiftKey) {
@@ -2911,6 +3901,9 @@ function clearContracts() {
     if (vsTimer) cancelAnimationFrame(vsTimer);
     vsTimer = requestAnimationFrame(() => render());
   });
+
+  // 存档系统 / 云同步初始化（事件委托、配置回填、配额显示、自动同步状态）
+  initArchiveSystem();
 })();
 
 // Global clear filter (called from button)

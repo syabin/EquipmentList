@@ -8,7 +8,7 @@
 
 - 纯 HTML/CSS/JavaScript（无框架依赖）
 - xlsx.js (SheetJS) 处理 Excel 导入导出
-- localStorage 本地存储
+- localStorage 本地存储 + GitHub Contents API 云端同步（可选）
 - 单文件部署：`index.html` 即全部代码
 
 ## 文件结构
@@ -23,18 +23,20 @@ EquipmentList/
 
 所有代码在 `index.html` 一个文件中，结构为：
 
-1. **CSS**（`<style>` 标签，~600 行）— 全局样式、表格、弹窗、存档面板
-2. **HTML**（`<body>` 部分）— 头部按钮栏、筛选栏、表格主体、弹窗
-3. **JavaScript**（`<script>` 标签，~1500+ 行）— 全部业务逻辑
+1. **CSS**（`<style>`）— 全局样式、表格、弹窗、存档面板 v2、云同步面板、通用弹窗、撤回提示
+2. **HTML**（`<body>`）— 头部按钮栏、筛选栏、表格主体、确认框、存档面板、云同步面板、通用弹窗
+3. **JavaScript**（`<script>`）— 全部业务逻辑（存档系统 + 云同步模块都在 `Archive System v2` / `GitHub 云端同步` 两段）
 
 ## 关键模块
 
 | 模块 | 主要函数 | 说明 |
 |------|---------|------|
 | 数据层 | `rows[]`, `modelRef[]`, `snapshot()` | 行数据数组、型号对照表 |
-| 撤销/重做 | `pushHistory()`, `undo()`, `redo()` | 50步历史栈，Ctrl+Z/Y |
-| 自动暂存 | `autoSave()`, `checkAutoSave()` | 每15秒存 localStorage |
-| 存档系统 | `saveArchive()`, `loadArchive()`, `exportAllArchives()` | 项目级存档管理 |
+| 撤销/重做 | `pushHistory()`, `undo()`, `redo()` | 50步历史栈，Ctrl+Z/Y；`pushHistory()` 同时调度云同步 |
+| 自动暂存 | `autoSave()`, `checkAutoSave()` | 每15秒存 localStorage；顺带定时自动快照 + 云同步兜底 |
+| 存档系统 v2 | `getArchives()`, `setArchives()`, `normalizeArchive()`, `saveArchive()`, `loadArchive()`, `renderArchiveList()`, `importArchives()` | 项目级存档；写入保护/配额/自动快照/撤回/搜索排序分页/批量/导入三策略 |
+| 云同步 | `ghConfig()`, `ghUpload()`, `ghPull()`, `ghShowDiff()`, `runGhAutoSync()` | GitHub Contents API；仓库 `syabin/task-data`，路径 `equipment-list/equipment-data.json` |
+| 工序批量 | `openProcessBatch()`, `applyProcessBatch()` | 表头「工序 ▾」；覆盖 / 仅填空 / 清空；`process` 也在 `bindEvents()` 的批量填充白名单内 |
 | 型号搜索 | `loadRefFromFile()`, 自动匹配逻辑 | 从 Excel 加载对照表，输入型号时自动填充 |
 | 工时计时 | `timerStart()`, `timerPause()`, `timerReset()` | 内置工时计时器 |
 | 渲染 | `render()` | 虚拟滚动渲染表格（性能优化） |
@@ -52,9 +54,21 @@ EquipmentList/
 ## 常量定义
 
 ```javascript
-ATTRS = ["3D-UT管道", "EE-电控系统", "LSU-UT元件", ...]  // 属性选项
-DEPTS = ["EC-单机", "EE", "LSU", "ME", "PSU", "SE", "3D"]  // 部门
+ATTRS = [...]  // 属性选项
+DEPTS = [...]  // 部门
 BIZS = ["RICH", "ROSS"]  // 业务线
+
+// 存档
+ARCHIVE_KEY = 'deviceList_archives'
+ARCHIVE_VERSION = 2
+ARCHIVE_MAX_BYTES = 4 * 1024 * 1024   // 写前校验，超限拒绝且不覆盖原库
+ARCHIVE_AUTO_KEEP = 5                  // 自动快照保留份数
+ARCHIVE_PAGE_SIZE = 20
+
+// 云同步（localStorage key 前缀 el-gh-*）
+EL_GH_CONFIG_KEY / EL_GH_TOKEN_KEY / EL_GH_SYNC_KEY
+默认仓库 syabin/task-data（与任务管理器共用）
+默认路径 equipment-list/equipment-data.json（任务管理器用 data/task-data.json）
 ```
 
 ## 修改指南
@@ -62,4 +76,10 @@ BIZS = ["RICH", "ROSS"]  // 业务线
 - **新增字段**：在 `COLS` 定义中添加列宽 → `<thead>` 添加表头 → `render()` 中添加单元格 → `rows` 对象添加默认值
 - **修改样式**：CSS 变量在 `:root` 中定义，表格列宽在 `.col-*` 类中
 - **导入逻辑**：参考 `loadRefFromFile()` 处理 xlsx 解析
-- **存档格式**：JSON 结构为 `{ version, exportTime, archives: [...] }`
+- **存档格式**：导出 JSON 为 `{ app:'EquipmentList', version:2, exportTime, archives:[...] }`；单条存档含 `id/name/note/time/timeStr/rows/nextId/timerElapsed/modelRef/kind/source/version/size`。`normalizeArchive()` 负责 v1 迁移与结构校验，坏数据返回 `null`
+- **存档写入**：任何改动都必须经 `setArchives()`（返回 boolean），不要直接 `localStorage.setItem(ARCHIVE_KEY, ...)`；改动后调 `renderArchiveList()` 与 `scheduleGhAutoSync()`
+- **云数据格式**：`buildCloudData()` 产出 `{ app, version, rows, nextId, timerElapsed, modelRef, archives }`（`withMeta=true` 时加 `exportTime`）；指纹 `ghLocalFingerprint()` 用不带时间戳的版本
+- **云同步**：`ghUpload({silent|force})` / `ghPull()` / `ghShowDiff()`；冲突依据 `ghGetSync().sha` 与远端 sha 比对；`applyCloudData()` 会先留本地快照再覆盖，覆盖存档库时保留该快照
+- **自动同步触发点**：`pushHistory()`（编辑）、`autoSave()`（15秒兜底）、所有存档写操作后调 `scheduleGhAutoSync()`；拉取期间用 `_ghSuppressAuto` 抑制回传
+- **UI 弹窗**：确认框 `showModal()`，多选用 `showChoiceModal()`，输入用 `showPromptModal()`，差异对比用 `openMiniModal(..., '760px')`；列表一律事件委托 `data-act`，不要在 HTML 里拼 `onclick` 参数
+- **验证**：抽取内联 script 用 `node --check` 检查语法，再用轻量 DOM mock 跑存档/云同步冒烟用例
