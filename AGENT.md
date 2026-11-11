@@ -41,7 +41,7 @@ EquipmentList/
 | 表格导航 | `handleCellArrow()`, `focusCell()`, `flushCellBeforeMove()` | 方向键移格；重绘前先派发 change 落库，避免丢输入 |
 | 自动填充 | `disableAutofill(root)` | `render()` 末尾与 `initArchiveSystem()` 各调一次，压住浏览器/密码管理器浮层 |
 | 自动编号 | `autoNumberMatch()`, `isAutoNumberDept()` | 按 `mainEquip='1'` 分组写 `matchMark`；**仅 `dept` 为 `AUTO_NUMBER_DEPT`（'ME'）的行写入**，其它部门跳过且保留原值、不打断分组 |
-| 型号搜索 | `loadRefFromFile()`, 自动匹配逻辑 | 从 Excel 加载对照表，输入型号时自动填充 |
+| 型号搜索 | `loadRefFromFile()`, `showAutocomplete()`, `acMatchScore()`, `acHighlight()`, `selectAcItem()` | 从 Excel 加载对照表（字段 `model/name/attr/dept/biz`）；**型号与设备名称都可搜**，型号命中优先，命中片段高亮；选中后回填型号 + 名称 + 属性 + 部门 + 业务归属 |
 | 工时计时 | `timerStart()`, `timerPause()`, `timerReset()` | 内置工时计时器 |
 | 渲染 | `render()` | 虚拟滚动渲染表格（性能优化） |
 | 导入导出 | `saveExcel()`, `exportExcel()` | xlsx.js 生成 Excel |
@@ -90,5 +90,6 @@ EL_GH_CONFIG_KEY / EL_GH_TOKEN_KEY / EL_GH_SYNC_KEY
 - **自动同步触发点**：`pushHistory()`（编辑）、`autoSave()`（15秒兜底）、所有存档写操作后调 `scheduleGhAutoSync()`；拉取期间用 `_ghSuppressAuto` 抑制回传
 - **UI 弹窗**：确认框 `showModal()`，多选用 `showChoiceModal()`，输入用 `showPromptModal()`，差异对比用 `openMiniModal(..., '760px')`；列表一律事件委托 `data-act`，不要在 HTML 里拼 `onclick` 参数
 - **方向键 / 自动填充**：方向键走全局 `keydown` 委托（不要放进 `bindEvents()`，虚拟滚动会重复绑定）；跳转前必须 `flushCellBeforeMove()` 落库。新增输入框由 `render()` 末尾的 `disableAutofill(tbody)` 与 init 时的 `disableAutofill(document)` 统一处理
+- **型号联想**：搜索字段在 `acMatchScore()` 里集中定义（目前 `m.model` / `m.name`，属性列只展示）。返回值越小优先级越高，`-1` 表示不命中；`showAutocomplete()` 按 `score → 原索引` 稳定排序后截 50 条。新增搜索字段必须同时更新 `acHighlight()` 的渲染列，且用 `acText()` 做空值安全，不要用 `m.xxx.toLowerCase()` 裸调（旧缓存可能缺字段）
 - **自动编号**：改部门限制只需改 `AUTO_NUMBER_DEPT`；`autoNumberMatch()` 遍历 `rows` 时先过 `isAutoNumberDept(r)`，非目标部门必须 `return`（不写 `matchMark`、不改 `inGroup`/`subNo`），否则会污染其它部门的配套标识。无目标部门行时提前 return，不要 `pushHistory()` 以免产生空撤销步。`pushHistory()` 已内含云同步调度，无需另调
 - **验证**：抽取内联 script 用 `node --check` 检查语法，再用轻量 DOM mock 跑存档/云同步/自动编号冒烟用例

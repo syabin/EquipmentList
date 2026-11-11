@@ -367,6 +367,7 @@ tbody td:last-child { border-right: none; }
 .ac-item .ac-model { font-weight: 600; color: var(--text); }
 .ac-item .ac-name { color: var(--text-secondary); font-size: 12px; margin-left: 8px; }
 .ac-item .ac-attr { color: #94a3b8; font-size: 11px; margin-left: 6px; }
+.ac-item .ac-hl { background: #fde68a; color: inherit; padding: 0 1px; border-radius: 2px; font-weight: 600; }
 
 /* Toast */
 .toast {
@@ -2691,7 +2692,7 @@ function render() {
     html += `<td class="col-vcode"><input class="cell-input" value="${esc(r.virtualCode)}" data-field="virtualCode" data-id="${r.id}" placeholder="虚拟码"></td>`;
     html += `<td class="col-contract"><input class="cell-input" value="${esc(r.contractNo)}" data-field="contractNo" data-id="${r.id}" placeholder="合同号"></td>`;
     html += `<td class="col-name"><input class="cell-input" value="${esc(r.equipName)}" data-field="equipName" data-id="${r.id}" placeholder="自动填充"></td>`;
-    html += `<td class="col-model"><div class="model-input-wrap"><input class="cell-input" value="${esc(r.model)}" data-field="model" data-id="${r.id}" placeholder="输入搜索型号..." autocomplete="off"></div></td>`;
+    html += `<td class="col-model"><div class="model-input-wrap"><input class="cell-input" value="${esc(r.model)}" data-field="model" data-id="${r.id}" placeholder="输入型号或名称搜索..." autocomplete="off"></div></td>`;
     html += `<td class="col-submodel"><input class="cell-input" value="${esc(r.subModel)}" data-field="subModel" data-id="${r.id}" placeholder="补充型号"></td>`;
     html += `<td class="col-attr">${selectHtml('attr', r.id, r.attr, ATTRS)}</td>`;
     html += `<td class="col-block"><input class="cell-input" value="${esc(r.blockOwner)}" data-field="blockOwner" data-id="${r.id}" placeholder="撬块归属"></td>`;
@@ -3573,6 +3574,34 @@ let acInput = null;
 let acIndex = -1;
 let acItems = [];
 
+// 联想搜索：型号 + 设备名称都可命中（属性列只展示，不参与搜索）
+// 优先级：型号前缀 > 名称前缀 > 型号包含 > 名称包含，保证输入型号时原体验不被挤掉
+function acText(v) { return String(v == null ? '' : v).trim().toLowerCase(); }
+
+function acMatchScore(m, query) {
+  if (!query) return 0;
+  const model = acText(m.model), name = acText(m.name);
+  if (model.startsWith(query)) return 0;
+  if (name.startsWith(query)) return 1;
+  if (model.includes(query)) return 2;
+  if (name.includes(query)) return 3;
+  return -1;
+}
+
+// 把命中的片段包成 <mark>，先按片段切再逐段 esc，避免破坏转义
+function acHighlight(v, query) {
+  const s = String(v == null ? '' : v);
+  if (!query) return esc(s);
+  const lower = s.toLowerCase(), q = query.toLowerCase();
+  let out = '', from = 0, pos = lower.indexOf(q);
+  while (pos !== -1) {
+    out += esc(s.slice(from, pos)) + '<mark class="ac-hl">' + esc(s.slice(pos, pos + q.length)) + '</mark>';
+    from = pos + q.length;
+    pos = lower.indexOf(q, from);
+  }
+  return out + esc(s.slice(from));
+}
+
 function showAutocomplete(inputEl) {
   if (modelRef.length === 0) return;
   acInput = inputEl;
@@ -3584,15 +3613,20 @@ function showAutocomplete(inputEl) {
     return;
   }
 
-  let filtered = modelRef;
-  if (query) {
-    filtered = modelRef.filter(m =>
-      m.model.toLowerCase().includes(query)
-    );
+  let matched;
+  if (!query) {
+    matched = modelRef.map((m, i) => ({ m: m, i: i, score: 0 }));
+  } else {
+    matched = [];
+    modelRef.forEach((m, i) => {
+      const score = acMatchScore(m, query);
+      if (score >= 0) matched.push({ m: m, i: i, score: score });
+    });
+    matched.sort((a, b) => a.score - b.score || a.i - b.i);
   }
 
-  filtered = filtered.slice(0, 50);
-  acItems = filtered;
+  const filtered = matched.slice(0, 50);
+  acItems = filtered.map(x => x.m);
 
   if (filtered.length === 0) {
     ac.classList.remove('show');
@@ -3600,10 +3634,11 @@ function showAutocomplete(inputEl) {
   }
 
   let html = '';
-  filtered.forEach((m, i) => {
+  filtered.forEach((x, i) => {
+    const m = x.m;
     html += `<div class="ac-item" data-index="${i}">
-      <span class="ac-model">${esc(m.model)}</span>
-      <span class="ac-name">${esc(m.name)}</span>
+      <span class="ac-model">${acHighlight(m.model, query)}</span>
+      <span class="ac-name">${acHighlight(m.name, query)}</span>
       <span class="ac-attr">${esc(m.attr)}</span>
     </div>`;
   });
