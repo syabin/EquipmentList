@@ -649,7 +649,8 @@ table.hide-nonessential .col-nameplate {
 .archive-item.is-auto{background:#f8fafc}
 .archive-item-main{flex:1;min-width:0}
 .archive-item-header{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
-.archive-item-name{font-size:13px;font-weight:600;color:var(--text);word-break:break-all}
+.archive-item-name{font-size:13px;font-weight:600;color:var(--text);word-break:break-all;cursor:pointer;border-bottom:1px dashed transparent}
+.archive-item-name:hover{color:var(--primary);border-bottom-color:var(--primary)}
 .archive-item-time{font-size:10px;color:var(--text-muted);margin-left:auto;white-space:nowrap}
 .archive-badge{font-size:10px;padding:1px 6px;border-radius:10px;background:#eef2ff;color:#4f46e5;white-space:nowrap}
 .archive-badge.auto{background:#f1f5f9;color:#64748b}
@@ -681,6 +682,7 @@ table.hide-nonessential .col-nameplate {
 .archive-group-arrow{font-size:11px;color:var(--text-secondary);width:12px;flex-shrink:0}
 .archive-group-name{font-size:13px;font-weight:600;color:var(--text);word-break:break-all}
 .archive-group-count{margin-left:auto;font-size:11px;color:var(--text-secondary);white-space:nowrap}
+.archive-group-pick{font-size:10px;padding:2px 8px;flex-shrink:0;white-space:nowrap}
 .archive-group-body{padding:8px 10px 10px}
 .archive-group-body .archive-list{gap:6px}
 .archive-group-body .archive-item{background:#fff}
@@ -966,7 +968,7 @@ table.hide-nonessential .col-nameplate {
         <input type="text" id="archiveNote" placeholder="备注（可选）" maxlength="120" autocomplete="off">
         <button class="btn btn-primary" onclick="saveArchive()">保存</button>
       </div>
-      <div class="archive-hint">按项目号分文件夹（同一存档含多个项目号会出现在多个文件夹，点击文件夹标题可折叠）· 回车保存 · Esc 关闭 · 同名询问覆盖/另存 · 加载前自动留快照，删除可撤回 · 勾选可批量导出/删除</div>
+      <div class="archive-hint">点存档名称或项目文件夹上的「🏷 填入」，可把对应项目号带进本输入框 · 按项目号分文件夹（同一存档含多个项目号会出现在多个文件夹，点击文件夹标题可折叠）· 回车保存 · Esc 关闭 · 同名询问覆盖/另存 · 加载前自动留快照，删除可撤回 · 勾选可批量导出/删除</div>
     </div>
   </div>
 </div>
@@ -1625,23 +1627,54 @@ function updateGroupToggleLabel(){
   const allClosed = groups.length > 0 && groups.every(g => archiveCollapsed.has(g[0]));
   btn.textContent = allClosed ? '全部展开' : '全部收起';
 }
+// 点选存档，把对应项目号填进底部「输入项目名称或项目号」保存框；只改输入框，不动表格数据
+function fillArchiveNameFromNo(no){
+  const input = document.getElementById('archiveName');
+  if (!input) return;
+  const v = String(no == null ? '' : no).trim();
+  if (!v) { showToast('这组存档未填项目号'); return; }
+  input.value = v;
+  input.focus();
+  try { input.select(); } catch(e){}
+  showToast('已填入项目号: ' + v);
+}
+function pickArchiveProjectNo(id){
+  const arch = getArchives().find(a => a.id === id);
+  if (!arch) { showToast('存档不存在'); return; }
+  const nos = archiveProjectNos(arch).filter(Boolean);
+  if (!nos.length) {
+    // 存档内没有项目号时，退而填入存档名称，方便在此基础上改名保存
+    const input = document.getElementById('archiveName');
+    if (input) { input.value = String(arch.name || '').trim(); input.focus(); }
+    showToast('该存档未填项目号，已填入存档名称');
+    return;
+  }
+  if (nos.length === 1) { fillArchiveNameFromNo(nos[0]); return; }
+  const opts = nos.map(n => ({ label: n, cls: 'btn-outline', onClick: () => fillArchiveNameFromNo(n) }));
+  opts.push({ label: '取消', cls: 'btn-outline' });
+  showChoiceModal('选择项目号', '该存档包含多个项目号，选一个填入下方保存框：', opts);
+}
 function onArchiveBodyClick(e){
+  // data-act 优先：分组头里的「填入」按钮不该触发折叠
+  const el = e.target.closest && e.target.closest('[data-act]');
+  if (el) {
+    const act = el.dataset.act, id = el.dataset.id;
+    if (act === 'pick-no') { pickArchiveProjectNo(id); return; }
+    if (act === 'pick-group-no') { fillArchiveNameFromNo(el.dataset.group || ''); return; }
+    if (act === 'select') { el.checked ? archiveSelected.add(id) : archiveSelected.delete(id); return; }
+    if (act === 'load') loadArchive(id);
+    else if (act === 'edit') editArchiveMeta(id);
+    else if (act === 'copy') duplicateArchive(id);
+    else if (act === 'export') exportOneArchive(id);
+    else if (act === 'delete') deleteArchive(id);
+    return;
+  }
   const head = e.target.closest && e.target.closest('.archive-group-head');
   if (head) {
     const key = head.dataset.group || '';
     if (archiveCollapsed.has(key)) archiveCollapsed.delete(key); else archiveCollapsed.add(key);
     renderArchiveList();
-    return;
   }
-  const el = e.target.closest('[data-act]');
-  if (!el) return;
-  const act = el.dataset.act, id = el.dataset.id;
-  if (act === 'select') { el.checked ? archiveSelected.add(id) : archiveSelected.delete(id); return; }
-  if (act === 'load') loadArchive(id);
-  else if (act === 'edit') editArchiveMeta(id);
-  else if (act === 'copy') duplicateArchive(id);
-  else if (act === 'export') exportOneArchive(id);
-  else if (act === 'delete') deleteArchive(id);
 }
 function renderArchivePager(total, size, unit){
   const el = document.getElementById('archivePager');
@@ -1664,7 +1697,7 @@ function archiveCardHtml(arch){
   let h = '<div class="archive-item' + (isCur ? ' is-current' : '') + (arch.kind === 'auto' ? ' is-auto' : '') + '">';
   h += '<input class="archive-item-check" type="checkbox" data-act="select" data-id="' + escAttr(arch.id) + '"' + (sel ? ' checked' : '') + ' title="勾选以批量操作">';
   h += '<div class="archive-item-main">';
-  h += '<div class="archive-item-header"><span class="archive-item-name">' + escHtml(arch.name) + '</span>' + badge + (isCur ? '<span class="archive-badge">当前</span>' : '') + '<span class="archive-item-time">' + escHtml(arch.timeStr) + '</span></div>';
+  h += '<div class="archive-item-header"><span class="archive-item-name" data-act="pick-no" data-id="' + escAttr(arch.id) + '" title="点击把该存档的项目号填入下方保存框">' + escHtml(arch.name) + '</span>' + badge + (isCur ? '<span class="archive-badge">当前</span>' : '') + '<span class="archive-item-time">' + escHtml(arch.timeStr) + '</span></div>';
   if (arch.note) h += '<div class="archive-item-note">📝 ' + escHtml(arch.note) + '</div>';
   h += '<div class="archive-item-meta">';
   h += '<span>📋 ' + arch.rows.length + ' 行</span>';
@@ -1706,6 +1739,7 @@ function renderGroupedArchives(arr, body){
     h += '<span class="archive-group-arrow">' + (collapsed ? '▸' : '▾') + '</span>';
     h += '<span class="archive-group-name">📁 ' + escHtml(no || '未填项目号') + '</span>';
     h += '<span class="archive-group-count">' + list.length + ' 个存档 · ' + rowTotal + ' 行</span>';
+    if (no) h += '<button class="btn btn-outline archive-group-pick" data-act="pick-group-no" data-group="' + escAttr(no) + '" title="把这个项目号填入下方保存框">🏷 填入</button>';
     h += '</div>';
     if (!collapsed) {
       h += '<div class="archive-group-body"><div class="archive-list">';
