@@ -669,6 +669,21 @@ table.hide-nonessential .col-nameplate {
 .archive-save-row .btn{font-size:11px;padding:4px 12px}
 .archive-hint{font-size:10px;color:var(--text-muted);margin-top:6px;line-height:1.6}
 
+/* ========== 存档分组（按项目号分文件夹） ========== */
+.archive-toolbar .btn{font-size:11px;padding:3px 8px}
+.archive-view-sel{max-width:150px}
+.archive-groups{display:flex;flex-direction:column;gap:10px}
+.archive-group{border:1px solid var(--border);border-radius:8px;overflow:hidden;background:#fff}
+.archive-group-head{display:flex;align-items:center;gap:8px;padding:9px 12px;background:#f1f5f9;cursor:pointer;user-select:none;border-bottom:1px solid var(--border)}
+.archive-group.collapsed .archive-group-head{border-bottom:none}
+.archive-group-head:hover{background:#e8eef7}
+.archive-group-arrow{font-size:11px;color:var(--text-secondary);width:12px;flex-shrink:0}
+.archive-group-name{font-size:13px;font-weight:600;color:var(--text);word-break:break-all}
+.archive-group-count{margin-left:auto;font-size:11px;color:var(--text-secondary);white-space:nowrap}
+.archive-group-body{padding:8px 10px 10px}
+.archive-group-body .archive-list{gap:6px}
+.archive-group-body .archive-item{background:#fff}
+
 /* ========== 云同步面板 ========== */
 .cloud-panel{width:720px}
 .cloud-body{padding:14px 16px;overflow-y:auto;flex:1}
@@ -757,7 +772,7 @@ table.hide-nonessential .col-nameplate {
       </div>
       <input type="file" id="contractFile" accept=".xlsx,.xls,.csv" style="display:none">
     </div>
-    <button class="btn btn-outline" onclick="autoNumberMatch()" title="按主设备=1分组，自动给每组的配套标识编序号（独立设备主设备=0不参与）">🔢 自动编号</button>
+    <button class="btn btn-outline" onclick="autoNumberMatch()" title="仅对责任部门为 ME 的行生效：按主设备=1分组，自动给每组的配套标识编序号（其它部门原值不动；独立设备主设备=0不参与）">🔢 自动编号</button>
     <label class="btn btn-outline" title="导入已有设备清单">
       📥 导入
       <input type="file" id="importFile" accept=".xlsx,.xls" style="display:none">
@@ -828,7 +843,7 @@ table.hide-nonessential .col-nameplate {
     <option value="qty">数量</option>
     <option value="line">条线</option>
   </select>
-  <input type="text" id="filterInput" placeholder="输入关键词筛选…" autocomplete="off">
+  <input type="text" id="filterInput" placeholder="输入关键词筛选…" autocomplete="off" data-lpignore="true" data-1p-ignore data-bwignore spellcheck="false" name="el_filter">
   <span class="filter-count" id="filterCount"></span>
   <button class="filter-clear" id="filterClear" style="display:none" onclick="clearFilter()">清除</button>
 </div>
@@ -919,13 +934,18 @@ table.hide-nonessential .col-nameplate {
       </div>
     </div>
     <div class="archive-toolbar">
-      <input type="text" id="archiveSearch" placeholder="搜索名称 / 备注" oninput="onArchiveSearch()" autocomplete="off">
+      <input type="text" id="archiveSearch" placeholder="搜索名称 / 备注 / 项目号" oninput="onArchiveSearch()" autocomplete="off" data-lpignore="true" data-1p-ignore data-bwignore spellcheck="false" name="el_archiveSearch">
+      <select id="archiveView" class="archive-view-sel" onchange="onArchiveViewChange()" title="显示方式">
+        <option value="group">📁 按项目号分组</option>
+        <option value="flat">☰ 平铺列表</option>
+      </select>
       <select id="archiveSort" onchange="onArchiveSortChange()" title="排序方式">
         <option value="time-desc">时间：新 → 旧</option>
         <option value="time-asc">时间：旧 → 新</option>
         <option value="name-asc">名称：A → Z</option>
         <option value="rows-desc">行数：多 → 少</option>
       </select>
+      <button class="btn btn-outline" id="archiveGroupToggle" onclick="toggleAllArchiveGroups()">全部收起</button>
       <span class="archive-quota" id="archiveQuota"></span>
     </div>
     <div class="archive-bulkbar">
@@ -945,7 +965,7 @@ table.hide-nonessential .col-nameplate {
         <input type="text" id="archiveNote" placeholder="备注（可选）" maxlength="120" autocomplete="off">
         <button class="btn btn-primary" onclick="saveArchive()">保存</button>
       </div>
-      <div class="archive-hint">回车保存 · Esc 关闭 · 同名会询问「覆盖 / 另存」· 加载前自动留一份快照，删除可撤回 · 勾选后可批量导出/删除</div>
+      <div class="archive-hint">按项目号分文件夹（同一存档含多个项目号会出现在多个文件夹，点击文件夹标题可折叠）· 回车保存 · Esc 关闭 · 同名询问覆盖/另存 · 加载前自动留快照，删除可撤回 · 勾选可批量导出/删除</div>
     </div>
   </div>
 </div>
@@ -1112,9 +1132,13 @@ const ARCHIVE_MAX_BYTES = 4 * 1024 * 1024;      // localStorage 安全上限（�
 const ARCHIVE_IMPORT_MAX_BYTES = 20 * 1024 * 1024;
 const ARCHIVE_AUTO_KEEP = 5;                     // 自动快照保留份数
 const ARCHIVE_PAGE_SIZE = 20;
+const ARCHIVE_GROUP_PAGE_SIZE = 10;              // 分组视图每页文件夹数
+const ARCHIVE_VIEW_KEY = 'deviceList_archiveView';
 let archivePage = 1;
 let archiveQuery = '';
 let archiveSort = 'time-desc';
+let archiveView = 'group';              // 'group' 按项目号分文件夹 | 'flat' 平铺
+let archiveCollapsed = new Set();       // 折叠的项目号（'' 表示「未填项目号」组）
 let archiveSelected = new Set();
 let currentArchiveId = '';
 let lastAutoSnapshotAt = 0;
@@ -1521,29 +1545,93 @@ function doImportArchives(list, mode){
   scheduleGhAutoSync();
 }
 
-// ====== 搜索 / 排序 / 分页 / 渲染（事件委托，不再拼 onclick） ======
+// ====== 搜索 / 排序 / 分组 / 分页 / 渲染（事件委托，不再拼 onclick） ======
 function onArchiveSearch(){ archiveQuery = (document.getElementById('archiveSearch').value || '').trim().toLowerCase(); archivePage = 1; renderArchiveList(); }
 function onArchiveSortChange(){ archiveSort = document.getElementById('archiveSort').value; archivePage = 1; renderArchiveList(); }
+function onArchiveViewChange(){
+  archiveView = document.getElementById('archiveView').value === 'flat' ? 'flat' : 'group';
+  archivePage = 1;
+  try { localStorage.setItem(ARCHIVE_VIEW_KEY, archiveView); } catch(e){}
+  renderArchiveList();
+}
 function gotoArchivePage(p){ archivePage = p; renderArchiveList(); const b = document.getElementById('archiveBody'); if (b) b.scrollTop = 0; }
+// 分组依据：存档内 rows 的项目号（去重）；一份存档含多个项目号会出现在多个文件夹
+function archiveProjectNos(arch){
+  const set = new Set();
+  (arch.rows || []).forEach(r => {
+    const p = String(r.projectNo || '').trim();
+    if (p) set.add(p);
+  });
+  return set.size ? Array.from(set) : [''];   // '' = 未填项目号
+}
+function archiveGroups(list){
+  const map = new Map();
+  list.forEach(a => archiveProjectNos(a).forEach(p => {
+    if (!map.has(p)) map.set(p, []);
+    map.get(p).push(a);
+  }));
+  let entries = Array.from(map.entries());
+  const label = p => p || '未填项目号';
+  const timeOf = (items, newest) => {
+    const ts = items.map(a => new Date(a.time).getTime() || 0);
+    return newest ? Math.max.apply(null, ts) : Math.min.apply(null, ts);
+  };
+  const rowsOf = items => items.reduce((n, a) => n + (a.rows ? a.rows.length : 0), 0);
+  if (archiveSort === 'rows-desc') entries.sort((a,b) => rowsOf(b[1]) - rowsOf(a[1]));
+  else if (archiveSort === 'time-asc') entries.sort((a,b) => timeOf(a[1], false) - timeOf(b[1], false));
+  else if (archiveSort === 'time-desc') entries.sort((a,b) => timeOf(b[1], true) - timeOf(a[1], true));
+  else entries.sort((a,b) => label(a[0]).localeCompare(label(b[0]), 'zh-CN'));
+  const emptyIdx = entries.findIndex(e => !e[0]);
+  if (emptyIdx >= 0) entries.push(entries.splice(emptyIdx, 1)[0]); // 未填项目号永远排最后
+  return entries;
+}
 function filteredArchives(){
   let arr = getArchives();
-  if (archiveQuery) arr = arr.filter(a => (a.name + ' ' + (a.note || '')).toLowerCase().indexOf(archiveQuery) >= 0);
+  if (archiveQuery) arr = arr.filter(a => (a.name + ' ' + (a.note || '') + ' ' + archiveProjectNos(a).join(' ')).toLowerCase().indexOf(archiveQuery) >= 0);
   if (archiveSort === 'time-asc') arr.sort((a,b) => new Date(a.time) - new Date(b.time));
   else if (archiveSort === 'name-asc') arr.sort((a,b) => a.name.localeCompare(b.name, 'zh-CN'));
   else if (archiveSort === 'rows-desc') arr.sort((a,b) => b.rows.length - a.rows.length);
   else arr.sort((a,b) => new Date(b.time) - new Date(a.time));
   return arr;
 }
-function archiveVisible(arr){
-  const pages = Math.max(1, Math.ceil(arr.length / ARCHIVE_PAGE_SIZE));
+function pageSlice(list, size){
+  const pages = Math.max(1, Math.ceil(list.length / size));
   archivePage = Math.min(Math.max(1, archivePage), pages);
-  return arr.slice((archivePage - 1) * ARCHIVE_PAGE_SIZE, archivePage * ARCHIVE_PAGE_SIZE);
+  return list.slice((archivePage - 1) * size, archivePage * size);
 }
+function archiveVisible(arr){ return pageSlice(arr, ARCHIVE_PAGE_SIZE); }
+function archiveVisibleGroups(groups){ return pageSlice(groups, ARCHIVE_GROUP_PAGE_SIZE); }
 function toggleArchiveSelectAll(on){
-  archiveVisible(filteredArchives()).forEach(a => on ? archiveSelected.add(a.id) : archiveSelected.delete(a.id));
+  let list = [];
+  if (archiveView === 'group') {
+    archiveVisibleGroups(archiveGroups(filteredArchives())).forEach(g => g[1].forEach(a => list.push(a)));
+  } else list = archiveVisible(filteredArchives());
+  list.forEach(a => on ? archiveSelected.add(a.id) : archiveSelected.delete(a.id));
   renderArchiveList();
 }
+function toggleAllArchiveGroups(){
+  const groups = archiveGroups(filteredArchives());
+  const anyOpen = groups.some(g => !archiveCollapsed.has(g[0]));
+  if (anyOpen) groups.forEach(g => archiveCollapsed.add(g[0]));
+  else archiveCollapsed.clear();
+  renderArchiveList();
+}
+function updateGroupToggleLabel(){
+  const btn = document.getElementById('archiveGroupToggle');
+  if (!btn) return;
+  btn.style.display = archiveView === 'group' ? '' : 'none';
+  const groups = archiveGroups(filteredArchives());
+  const allClosed = groups.length > 0 && groups.every(g => archiveCollapsed.has(g[0]));
+  btn.textContent = allClosed ? '全部展开' : '全部收起';
+}
 function onArchiveBodyClick(e){
+  const head = e.target.closest && e.target.closest('.archive-group-head');
+  if (head) {
+    const key = head.dataset.group || '';
+    if (archiveCollapsed.has(key)) archiveCollapsed.delete(key); else archiveCollapsed.add(key);
+    renderArchiveList();
+    return;
+  }
   const el = e.target.closest('[data-act]');
   if (!el) return;
   const act = el.dataset.act, id = el.dataset.id;
@@ -1554,20 +1642,86 @@ function onArchiveBodyClick(e){
   else if (act === 'export') exportOneArchive(id);
   else if (act === 'delete') deleteArchive(id);
 }
-function renderArchivePager(total){
+function renderArchivePager(total, size, unit){
   const el = document.getElementById('archivePager');
   if (!el) return;
-  const pages = Math.max(1, Math.ceil(total / ARCHIVE_PAGE_SIZE));
-  el.innerHTML = '共 ' + total + ' 个 · 第 ' + archivePage + '/' + pages + ' 页' +
+  const pageSize = size || ARCHIVE_PAGE_SIZE;
+  const pages = Math.max(1, Math.ceil(total / pageSize));
+  el.innerHTML = '共 ' + total + ' ' + (unit || '个') + ' · 第 ' + archivePage + '/' + pages + ' 页' +
     ' <button class="btn btn-outline" onclick="gotoArchivePage(1)"' + (archivePage <= 1 ? ' disabled' : '') + '>首页</button>' +
     ' <button class="btn btn-outline" onclick="gotoArchivePage(' + (archivePage-1) + ')"' + (archivePage <= 1 ? ' disabled' : '') + '>上一页</button>' +
     ' <button class="btn btn-outline" onclick="gotoArchivePage(' + (archivePage+1) + ')"' + (archivePage >= pages ? ' disabled' : '') + '>下一页</button>' +
     ' <button class="btn btn-outline" onclick="gotoArchivePage(' + pages + ')"' + (archivePage >= pages ? ' disabled' : '') + '>末页</button>';
 }
+function archiveCardHtml(arch){
+  const sel = archiveSelected.has(arch.id);
+  const size = arch.size || bytesOf(JSON.stringify(arch));
+  const badge = arch.kind === 'auto' ? '<span class="archive-badge auto">🤖 自动</span>' :
+    (arch.source === 'import' ? '<span class="archive-badge import">导入</span>' :
+     (arch.source === 'cloud' ? '<span class="archive-badge cloud">云端</span>' : ''));
+  const isCur = currentArchiveId === arch.id;
+  let h = '<div class="archive-item' + (isCur ? ' is-current' : '') + (arch.kind === 'auto' ? ' is-auto' : '') + '">';
+  h += '<input class="archive-item-check" type="checkbox" data-act="select" data-id="' + escAttr(arch.id) + '"' + (sel ? ' checked' : '') + ' title="勾选以批量操作">';
+  h += '<div class="archive-item-main">';
+  h += '<div class="archive-item-header"><span class="archive-item-name">' + escHtml(arch.name) + '</span>' + badge + (isCur ? '<span class="archive-badge">当前</span>' : '') + '<span class="archive-item-time">' + escHtml(arch.timeStr) + '</span></div>';
+  if (arch.note) h += '<div class="archive-item-note">📝 ' + escHtml(arch.note) + '</div>';
+  h += '<div class="archive-item-meta">';
+  h += '<span>📋 ' + arch.rows.length + ' 行</span>';
+  h += '<span>' + (arch.modelRef ? '✅ ' + arch.modelRef.length + ' 个型号' : '无对照表') + '</span>';
+  h += '<span>💾 ' + formatBytes(size) + '</span>';
+  h += '<span>⏱ ' + formatTime(arch.timerElapsed || 0) + '</span>';
+  h += '<span>v' + (arch.version || 1) + '</span>';
+  if (archiveView === 'group') {
+    const nos = archiveProjectNos(arch).filter(Boolean);
+    if (nos.length > 1) h += '<span>🔖 ' + escHtml(nos.join('、')) + '</span>';
+  }
+  h += '</div>';
+  h += '<div class="archive-item-actions">';
+  h += '<button class="btn btn-primary" data-act="load" data-id="' + escAttr(arch.id) + '">加载</button>';
+  h += '<button class="btn btn-outline" data-act="edit" data-id="' + escAttr(arch.id) + '">✎ 编辑</button>';
+  h += '<button class="btn btn-outline" data-act="copy" data-id="' + escAttr(arch.id) + '">⧉ 复制</button>';
+  h += '<button class="btn btn-outline" data-act="export" data-id="' + escAttr(arch.id) + '">📤 导出</button>';
+  h += '<button class="btn btn-danger" data-act="delete" data-id="' + escAttr(arch.id) + '">删除</button>';
+  h += '</div></div></div>';
+  return h;
+}
+function renderFlatArchives(arr, body){
+  let h = '<div class="archive-list">';
+  archiveVisible(arr).forEach(a => { h += archiveCardHtml(a); });
+  h += '</div>';
+  body.innerHTML = h;
+  renderArchivePager(arr.length, ARCHIVE_PAGE_SIZE, '个存档');
+}
+function renderGroupedArchives(arr, body){
+  const groups = archiveGroups(arr);
+  const page = archiveVisibleGroups(groups);
+  let h = '<div class="archive-groups">';
+  page.forEach(g => {
+    const no = g[0], list = g[1];
+    const collapsed = archiveCollapsed.has(no);
+    const rowTotal = list.reduce((n, a) => n + (a.rows ? a.rows.length : 0), 0);
+    h += '<div class="archive-group' + (collapsed ? ' collapsed' : '') + '">';
+    h += '<div class="archive-group-head" data-group="' + escAttr(no) + '" title="点击展开 / 收起">';
+    h += '<span class="archive-group-arrow">' + (collapsed ? '▸' : '▾') + '</span>';
+    h += '<span class="archive-group-name">📁 ' + escHtml(no || '未填项目号') + '</span>';
+    h += '<span class="archive-group-count">' + list.length + ' 个存档 · ' + rowTotal + ' 行</span>';
+    h += '</div>';
+    if (!collapsed) {
+      h += '<div class="archive-group-body"><div class="archive-list">';
+      list.forEach(a => { h += archiveCardHtml(a); });
+      h += '</div></div>';
+    }
+    h += '</div>';
+  });
+  h += '</div>';
+  body.innerHTML = h;
+  renderArchivePager(groups.length, ARCHIVE_GROUP_PAGE_SIZE, '个项目文件夹');
+}
 function renderArchiveList(){
   const body = document.getElementById('archiveBody');
   if (!body) return;
   updateArchiveQuota();
+  updateGroupToggleLabel();
   const all = getArchives();
   const arr = filteredArchives();
   if (!arr.length) {
@@ -1575,37 +1729,8 @@ function renderArchiveList(){
     const pg = document.getElementById('archivePager'); if (pg) pg.innerHTML = '';
     return;
   }
-  let h = '<div class="archive-list">';
-  archiveVisible(arr).forEach(arch => {
-    const sel = archiveSelected.has(arch.id);
-    const size = arch.size || bytesOf(JSON.stringify(arch));
-    const badge = arch.kind === 'auto' ? '<span class="archive-badge auto">🤖 自动</span>' :
-      (arch.source === 'import' ? '<span class="archive-badge import">导入</span>' :
-       (arch.source === 'cloud' ? '<span class="archive-badge cloud">云端</span>' : ''));
-    const isCur = currentArchiveId === arch.id;
-    h += '<div class="archive-item' + (isCur ? ' is-current' : '') + (arch.kind === 'auto' ? ' is-auto' : '') + '">';
-    h += '<input class="archive-item-check" type="checkbox" data-act="select" data-id="' + escAttr(arch.id) + '"' + (sel ? ' checked' : '') + ' title="勾选以批量操作">';
-    h += '<div class="archive-item-main">';
-    h += '<div class="archive-item-header"><span class="archive-item-name">' + escHtml(arch.name) + '</span>' + badge + (isCur ? '<span class="archive-badge">当前</span>' : '') + '<span class="archive-item-time">' + escHtml(arch.timeStr) + '</span></div>';
-    if (arch.note) h += '<div class="archive-item-note">📝 ' + escHtml(arch.note) + '</div>';
-    h += '<div class="archive-item-meta">';
-    h += '<span>📋 ' + arch.rows.length + ' 行</span>';
-    h += '<span>' + (arch.modelRef ? '✅ ' + arch.modelRef.length + ' 个型号' : '无对照表') + '</span>';
-    h += '<span>💾 ' + formatBytes(size) + '</span>';
-    h += '<span>⏱ ' + formatTime(arch.timerElapsed || 0) + '</span>';
-    h += '<span>v' + (arch.version || 1) + '</span>';
-    h += '</div>';
-    h += '<div class="archive-item-actions">';
-    h += '<button class="btn btn-primary" data-act="load" data-id="' + escAttr(arch.id) + '">加载</button>';
-    h += '<button class="btn btn-outline" data-act="edit" data-id="' + escAttr(arch.id) + '">✎ 编辑</button>';
-    h += '<button class="btn btn-outline" data-act="copy" data-id="' + escAttr(arch.id) + '">⧉ 复制</button>';
-    h += '<button class="btn btn-outline" data-act="export" data-id="' + escAttr(arch.id) + '">📤 导出</button>';
-    h += '<button class="btn btn-danger" data-act="delete" data-id="' + escAttr(arch.id) + '">删除</button>';
-    h += '</div></div></div>';
-  });
-  h += '</div>';
-  body.innerHTML = h;
-  renderArchivePager(arr.length);
+  if (archiveView === 'group') renderGroupedArchives(arr, body);
+  else renderFlatArchives(arr, body);
 }
 function initArchiveSystem(){
   const body = document.getElementById('archiveBody');
@@ -1619,6 +1744,13 @@ function initArchiveSystem(){
   document.getElementById('miniOverlay').addEventListener('click', e => { if (e.target.id === 'miniOverlay') closeMiniModal(); });
   lastAutoSnapshotAt = Date.now();
   lastAutoSnapshotSig = archiveSignature();
+  disableAutofill(document);   // 静态输入框（筛选 / 存档 / 云同步 / 弹窗）一并抑制自动填充
+  try {
+    const v = localStorage.getItem(ARCHIVE_VIEW_KEY);
+    if (v === 'flat' || v === 'group') archiveView = v;
+  } catch(e){}
+  const viewSel = document.getElementById('archiveView');
+  if (viewSel) viewSel.value = archiveView;
   ghLoadConfig();
   renderArchiveList();
   if (ghAutoSyncEnabled()) {
@@ -2392,6 +2524,117 @@ function closeModal() {
 }
 
 // ========== Render ==========
+// ========== 自动填充抑制 / 方向键导航 ==========
+// 浏览器与密码管理器会把表格格子误判为可填充字段，弹出历史值 /「管理密码…」浮层。
+// 统一加 autocomplete=off + 各密码管理器忽略标记 + 唯一 name（避免跨页面串历史值）。
+function disableAutofill(root){
+  const scope = root || document;
+  if (!scope.querySelectorAll) return;
+  const list = scope.querySelectorAll('input');
+  Array.prototype.forEach.call(list, el => {
+    const type = String(el.type || 'text').toLowerCase();
+    if (type === 'file' || type === 'checkbox' || type === 'radio' || type === 'hidden') return;
+    el.setAttribute('autocomplete', 'off');
+    el.setAttribute('data-lpignore', 'true');   // LastPass
+    el.setAttribute('data-1p-ignore', '');      // 1Password
+    el.setAttribute('data-bwignore', '');       // Bitwarden
+    el.setAttribute('data-form-type', 'other');
+    if (type !== 'password') el.setAttribute('spellcheck', 'false');
+    if (type !== 'password' && !el.getAttribute('name')) {
+      const d = el.dataset || {};
+      el.setAttribute('name', d.field ? ('el_' + d.field + '_' + (d.id || 'x')) : ('el_' + (el.id || 'field')));
+    }
+  });
+}
+
+// 与 render() 相同的显示顺序（筛选后的行），供方向键上下移动使用
+function getDisplayRows(){
+  let list = rows;
+  const q = filterText.toLowerCase();
+  const f = document.getElementById('filterField') ? document.getElementById('filterField').value : '';
+  if (filterText) list = rows.filter(r => matchFilter(r, f, q));
+  return list;
+}
+// 滚动到目标行 → 重绘虚拟表格 → 聚焦目标格子
+function focusCell(rowId, field){
+  const wrapper = document.querySelector('.table-wrapper');
+  const display = getDisplayRows();
+  const pos = display.findIndex(r => r.id === rowId);
+  if (pos >= 0 && wrapper && typeof wrapper.clientHeight === 'number' && wrapper.clientHeight > 0) {
+    const top = pos * ROW_HEIGHT;
+    const viewH = wrapper.clientHeight;
+    if (top < wrapper.scrollTop) wrapper.scrollTop = Math.max(0, top - ROW_HEIGHT);
+    else if (top + ROW_HEIGHT > wrapper.scrollTop + viewH) wrapper.scrollTop = top + ROW_HEIGHT - viewH;
+  }
+  render();
+  const target = document.querySelector('tr[data-id="' + rowId + '"] [data-field="' + field + '"][data-id="' + rowId + '"]');
+  if (target && target.focus) {
+    target.focus();
+    if (target.tagName === 'INPUT' && typeof target.select === 'function') target.select();
+  }
+}
+// 跳转会重绘虚拟表格，先把当前格子里尚未触发 change 的输入值落库，避免丢数据
+function flushCellBeforeMove(el){
+  try {
+    if (typeof Event === 'function' && el.dispatchEvent) el.dispatchEvent(new Event('change', { bubbles: true }));
+  } catch(e){}
+  // 兜底：无 Event / 事件分发失败时直接同步
+  const id = parseInt(el.dataset.id, 10);
+  const field = el.dataset.field;
+  const row = rows.find(r => r.id === id);
+  if (!row) return;
+  let v = el.value;
+  if (field === 'qty' || field === 'line' || field === 'year') v = v ? parseInt(v, 10) : '';
+  if (String(row[field] == null ? '' : row[field]) !== String(v)) { pushHistory(); row[field] = v; }
+}
+// 方向键移动当前格子：↑↓ 上下行同列；←→ 在文本光标到达边界时左右列（不破坏文本编辑）
+function handleCellArrow(e){
+  if (e.defaultPrevented) return false;
+  const el = e.target;
+  if (!el || !el.classList || !el.classList.contains('cell-input')) return false;
+  const key = e.key;
+  if (key !== 'ArrowUp' && key !== 'ArrowDown' && key !== 'ArrowLeft' && key !== 'ArrowRight') return false;
+  const ac = document.getElementById('autocomplete');
+  if ((key === 'ArrowUp' || key === 'ArrowDown') && ac && ac.classList.contains('show')) return false; // 型号联想优先
+  const tr = el.closest ? el.closest('tr') : null;
+  if (!tr) return false;
+  const rowId = parseInt(el.dataset.id, 10);
+  const field = el.dataset.field;
+  if (isNaN(rowId) || !field) return false;
+
+  if (key === 'ArrowLeft' || key === 'ArrowRight') {
+    const v = String(el.value || '');
+    const pos = el.selectionStart == null ? v.length : el.selectionStart;
+    const end = el.selectionEnd == null ? v.length : el.selectionEnd;
+    if (pos !== end) return false;                       // 有选区，保留原生
+    if (key === 'ArrowLeft' && pos > 0) return false;    // 光标不在最左，先移动文本光标
+    if (key === 'ArrowRight' && pos < v.length) return false;
+    const visible = x => {
+      const td = x.closest ? x.closest('td') : null;
+      if (!td || td.offsetParent === null) return td ? false : true;
+      try { if (window.getComputedStyle && window.getComputedStyle(td).display === 'none') return false; } catch(err){}
+      return true;
+    };
+    const cells = Array.prototype.filter.call(tr.querySelectorAll('.cell-input, .cell-select'), visible);
+    const idx = cells.indexOf(el);
+    const next = cells[key === 'ArrowLeft' ? idx - 1 : idx + 1];
+    if (!next || !next.dataset.field) return false;
+    e.preventDefault();
+    flushCellBeforeMove(el);
+    focusCell(rowId, next.dataset.field);
+    return true;
+  }
+  const display = getDisplayRows();
+  const pos = display.findIndex(r => r.id === rowId);
+  if (pos < 0) return false;
+  const target = display[key === 'ArrowUp' ? pos - 1 : pos + 1];
+  if (!target) return false;
+  e.preventDefault();
+  flushCellBeforeMove(el);
+  focusCell(target.id, field);
+  return true;
+}
+
 function render() {
   renderVersion++;
   const tbody = document.getElementById('tableBody');
@@ -2475,6 +2718,7 @@ function render() {
   tbody.innerHTML = html;
   updateInfo();
   bindEvents();
+  disableAutofill(tbody);   // 每次重绘都压住浏览器/密码管理器的自动填充浮层
 }
 
 function selectHtml(field, id, value, options) {
@@ -3243,6 +3487,10 @@ document.addEventListener('keydown', e => {
   }
   // 存档 / 云同步 / 通用弹窗内的输入不触发表格快捷键
   if (e.target && e.target.closest && e.target.closest('#archiveOverlay, #cloudOverlay, #miniOverlay')) return;
+  // 表格方向键：↑↓ 上下行同列，←→ 在文本光标到边界时左右列
+  if (e.key && e.key.indexOf('Arrow') === 0 && !e.ctrlKey && !e.metaKey && !e.shiftKey && !e.altKey) {
+    if (handleCellArrow(e)) return;
+  }
   // Ctrl+C: copy
   if ((e.ctrlKey || e.metaKey) && e.key === 'c') {
     // Only intercept if focus is inside the table
@@ -3733,13 +3981,31 @@ function smarkToCode(sm) {
 function padNum(n, width) { return String(n).padStart(width, '0'); }
 function isEmptyContract(r) { return !r.contractNo || String(r.contractNo).trim() === ''; }
 
+// 自动编号只对这个责任部门生效；其它部门整行跳过（配套标识保留原值，也不打断 ME 的分组）
+const AUTO_NUMBER_DEPT = 'ME';
+function isAutoNumberDept(r) {
+  return String(r.dept == null ? '' : r.dept).trim().toUpperCase() === AUTO_NUMBER_DEPT;
+}
+
 function autoNumberMatch() {
   if (rows.length === 0) { showToast('没有数据可编号'); return; }
+  if (!rows.some(isAutoNumberDept)) {
+    showToast(`没有责任部门为 ${AUTO_NUMBER_DEPT} 的行，未做改动`);
+    return;
+  }
   pushHistory();
   let groupNo = 0;
   let inGroup = false;
   let subNo = 0;   // 组内序号：每组独立，从 1 开始依次增加
+  let skipped = 0; // 其它部门行数
+  let kept = 0;    // 其它部门里原本已有配套标识、现在仍保留的行数
   rows.forEach(r => {
+    // 责任部门不是 ME：不参与编号、不写入、不打断分组
+    if (!isAutoNumberDept(r)) {
+      skipped++;
+      if (String(r.matchMark == null ? '' : r.matchMark).trim() !== '') kept++;
+      return;
+    }
     const me = String(r.mainEquip == null ? '' : r.mainEquip).trim();
     if (me === '1') {
       // 组起点：主设备=1，组内序号重置
@@ -3762,7 +4028,9 @@ function autoNumberMatch() {
     }
   });
   render();
-  showToast(`已自动编号 ${groupNo} 组`);
+  let msg = `已自动编号 ${groupNo} 组（仅 ${AUTO_NUMBER_DEPT}），跳过 ${skipped} 行其它部门`;
+  if (kept) msg += `，其中 ${kept} 行原有配套标识已保留`;
+  showToast(msg);
 }
 
 function simulateContracts() {

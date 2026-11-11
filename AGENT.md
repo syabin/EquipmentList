@@ -37,6 +37,10 @@ EquipmentList/
 | 存档系统 v2 | `getArchives()`, `setArchives()`, `normalizeArchive()`, `saveArchive()`, `loadArchive()`, `renderArchiveList()`, `importArchives()` | 项目级存档；写入保护/配额/自动快照/撤回/搜索排序分页/批量/导入三策略 |
 | 云同步 | `ghConfig()`, `ghUpload()`, `ghPull()`, `ghShowDiff()`, `runGhAutoSync()` | GitHub Contents API；仓库 `syabin/task-data`，路径 `equipment-list/equipment-data.json` |
 | 工序批量 | `openProcessBatch()`, `applyProcessBatch()` | 表头「工序 ▾」；覆盖 / 仅填空 / 清空；`process` 也在 `bindEvents()` 的批量填充白名单内 |
+| 分组视图 | `archiveProjectNos()`, `archiveGroups()`, `renderGroupedArchives()` | 按 `rows[].projectNo` 折文件夹；多项目号重复出现；`deviceList_archiveView` 记住平铺/分组 |
+| 表格导航 | `handleCellArrow()`, `focusCell()`, `flushCellBeforeMove()` | 方向键移格；重绘前先派发 change 落库，避免丢输入 |
+| 自动填充 | `disableAutofill(root)` | `render()` 末尾与 `initArchiveSystem()` 各调一次，压住浏览器/密码管理器浮层 |
+| 自动编号 | `autoNumberMatch()`, `isAutoNumberDept()` | 按 `mainEquip='1'` 分组写 `matchMark`；**仅 `dept` 为 `AUTO_NUMBER_DEPT`（'ME'）的行写入**，其它部门跳过且保留原值、不打断分组 |
 | 型号搜索 | `loadRefFromFile()`, 自动匹配逻辑 | 从 Excel 加载对照表，输入型号时自动填充 |
 | 工时计时 | `timerStart()`, `timerPause()`, `timerReset()` | 内置工时计时器 |
 | 渲染 | `render()` | 虚拟滚动渲染表格（性能优化） |
@@ -57,6 +61,7 @@ EquipmentList/
 ATTRS = [...]  // 属性选项
 DEPTS = [...]  // 部门
 BIZS = ["RICH", "ROSS"]  // 业务线
+AUTO_NUMBER_DEPT = 'ME'  // 自动编号唯一允许的责任部门（isAutoNumberDept() 做 trim + toUpperCase 比较）
 
 // 存档
 ARCHIVE_KEY = 'deviceList_archives'
@@ -64,6 +69,8 @@ ARCHIVE_VERSION = 2
 ARCHIVE_MAX_BYTES = 4 * 1024 * 1024   // 写前校验，超限拒绝且不覆盖原库
 ARCHIVE_AUTO_KEEP = 5                  // 自动快照保留份数
 ARCHIVE_PAGE_SIZE = 20
+ARCHIVE_GROUP_PAGE_SIZE = 10           // 分组视图每页文件夹数
+ARCHIVE_VIEW_KEY = 'deviceList_archiveView'
 
 // 云同步（localStorage key 前缀 el-gh-*）
 EL_GH_CONFIG_KEY / EL_GH_TOKEN_KEY / EL_GH_SYNC_KEY
@@ -82,4 +89,6 @@ EL_GH_CONFIG_KEY / EL_GH_TOKEN_KEY / EL_GH_SYNC_KEY
 - **云同步**：`ghUpload({silent|force})` / `ghPull()` / `ghShowDiff()`；冲突依据 `ghGetSync().sha` 与远端 sha 比对；`applyCloudData()` 会先留本地快照再覆盖，覆盖存档库时保留该快照
 - **自动同步触发点**：`pushHistory()`（编辑）、`autoSave()`（15秒兜底）、所有存档写操作后调 `scheduleGhAutoSync()`；拉取期间用 `_ghSuppressAuto` 抑制回传
 - **UI 弹窗**：确认框 `showModal()`，多选用 `showChoiceModal()`，输入用 `showPromptModal()`，差异对比用 `openMiniModal(..., '760px')`；列表一律事件委托 `data-act`，不要在 HTML 里拼 `onclick` 参数
-- **验证**：抽取内联 script 用 `node --check` 检查语法，再用轻量 DOM mock 跑存档/云同步冒烟用例
+- **方向键 / 自动填充**：方向键走全局 `keydown` 委托（不要放进 `bindEvents()`，虚拟滚动会重复绑定）；跳转前必须 `flushCellBeforeMove()` 落库。新增输入框由 `render()` 末尾的 `disableAutofill(tbody)` 与 init 时的 `disableAutofill(document)` 统一处理
+- **自动编号**：改部门限制只需改 `AUTO_NUMBER_DEPT`；`autoNumberMatch()` 遍历 `rows` 时先过 `isAutoNumberDept(r)`，非目标部门必须 `return`（不写 `matchMark`、不改 `inGroup`/`subNo`），否则会污染其它部门的配套标识。无目标部门行时提前 return，不要 `pushHistory()` 以免产生空撤销步。`pushHistory()` 已内含云同步调度，无需另调
+- **验证**：抽取内联 script 用 `node --check` 检查语法，再用轻量 DOM mock 跑存档/云同步/自动编号冒烟用例
