@@ -790,6 +790,14 @@ table.hide-nonessential .col-nameplate {
     <button class="btn btn-warning" onclick="showArchivePanel()" title="项目存档管理">📁 存档</button>
     <button class="btn btn-outline" onclick="showCloudPanel()" title="GitHub 云端同步（与任务管理器共用仓库）">☁ 云同步</button>
     <span id="elGhAutoStatus" class="gh-auto-status" title=""></span>
+    <div class="cmenu-wrap" id="dataBakWrap">
+      <button class="btn btn-outline" id="dataBakBtn" title="整机数据备份 / 恢复（工作区+存档+对照表+工时）">🗄 数据 ▾</button>
+      <div class="cmenu-panel" id="dataBakPanel">
+        <div class="cmenu-item" onclick="hideDataBak();exportFullData()">📤 导出数据 (JSON)</div>
+        <div class="cmenu-item" onclick="hideDataBak();document.getElementById('fullDataImportFile').click()">📥 导入数据 (JSON)</div>
+        <input type="file" id="fullDataImportFile" accept=".json" style="display:none" onchange="importFullData(event)">
+      </div>
+    </div>
     <button class="btn btn-success" onclick="saveExcel()">💾 保存</button>
     <button class="btn btn-outline" onclick="exportExcel()">📤 导出</button>
   </div>
@@ -1486,6 +1494,112 @@ function downloadJson(data, filename){
   const a = document.createElement('a');
   a.href = url; a.download = filename; document.body.appendChild(a); a.click(); a.remove();
   setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+// ====== 整机数据备份 / 恢复（工作区 + 存档库 + 型号对照表 + 累计工时） ======
+// 导出格式与 GitHub 云端数据一致（buildCloudData），既可从文件恢复，也能直接上传为云端数据。
+function exportFullData(){
+  const data = buildCloudData(true);
+  downloadJson(data, '设备清单数据备份_' + stampName() + '.json');
+  showToast('已导出数据：' + rows.length + ' 行 / ' + getArchives().length + ' 个存档 / ' + modelRef.length + ' 个型号');
+}
+function importFullData(e){
+  const file = e.target.files[0];
+  e.target.value = '';
+  if (!file) return;
+  if (file.size > ARCHIVE_IMPORT_MAX_BYTES) { showToast('导入文件超过 20MB，已中止'); return; }
+  const reader = new FileReader();
+  reader.onload = function(ev){
+    let obj;
+    try { obj = JSON.parse(ev.target.result); }
+    catch(err){ showToast('导入失败：不是合法 JSON'); return; }
+    if (!obj || !Array.isArray(obj.rows)) { showToast('导入失败：缺少 rows 数组（不是本工具导出的数据文件）'); return; }
+    if (obj.archives != null && !Array.isArray(obj.archives)) { showToast('导入失败：存档库结构异常'); return; }
+    if (obj.modelRef != null && !Array.isArray(obj.modelRef)) { showToast('导入失败：对照表结构异常'); return; }
+    const nRow = obj.rows.length;
+    const nArc = Array.isArray(obj.archives) ? obj.archives.length : 0;
+    const nRef = Array.isArray(obj.modelRef) ? obj.modelRef.length : 0;
+    showChoiceModal('导入整机数据', '文件含 ' + nRow + ' 行工作区、' + nArc + ' 个存档、' + nRef + ' 个型号对照。\n' +
+      '覆盖：清空现有数据后整体替换（导入前自动留一份存档快照）。\n' +
+      '合并：保留现有数据，仅追加 id 不重复的行 / 存档 / 型号。', [
+      { label:'覆盖导入', cls:'btn-primary', onClick: () => doImportFullData(obj, 'overwrite') },
+      { label:'合并导入', cls:'btn-outline', onClick: () => doImportFullData(obj, 'merge') },
+      { label:'取消', cls:'btn-outline', onClick: () => {} }
+    ]);
+  };
+  reader.onerror = () => { showToast('导入失败：文件读取错误'); };
+  reader.readAsText(file);
+}
+function doImportFullData(obj, mode){
+  // 留底：覆盖前先存一份当前存档快照，便于回退
+  const snap = createAutoSnapshot('导入数据前', true);
+  if (!snap) showToast('未能留取导入前快照（存档空间不足），请谨慎继续');
+  let addedRows = 0, addedArc = 0, addedRef = 0;
+  try {
+    if (mode === 'overwrite') {
+      rows = JSON.parse(JSON.stringify(obj.rows));
+      nextId = Number(obj.nextId) || rows.length + 1;
+      timerPause();
+      timerElapsed = Number(obj.timerElapsed) || 0;
+      updateTimerDisplay(); saveTimerState();
+      // 对照表：文件带则恢复，否则不动
+      if (Array.isArray(obj.modelRef)) {
+        modelRef = JSON.parse(JSON.stringify(obj.modelRef));
+        try { localStorage.setItem(REF_CACHE_KEY, JSON.stringify(modelRef)); localStorage.setItem(REF_CACHE_TIME_KEY, new Date().toISOString()); } catch(e){}
+        updateRefStatus('loaded', '导入对照表');
+      }
+      // 存档库：文件带则整体替换，并把刚生成的快照并进去保证可回退
+      if (Array.isArray(obj.archives)) {
+        const list = obj.archives.map(normalizeArchive).filter(Boolean);
+        if (snap && !list.some(a => a.id === snap.id)) list.unshift(snap);
+        if (!setArchives(list)) throw new Error('存档库写入失败（空间不足），已停止覆盖');
+        currentArchiveId = '';
+      }
+      undoStack = []; redoStack = []; updateUndoUI();
+      filterText = '';
+      const fi = document.getElementById('filterInput'); if (fi) fi.value = '';
+      render(); autoSave(); renderArchiveList();
+      showToast('数据已覆盖导入：' + rows.length + ' 行 / ' + getArchives().length + ' 个存档');
+    } else {
+      // 合并：按 id 去重追加
+      const seenRow = new Set(rows.map(r => String(r.id)));
+      obj.rows.forEach(r => {
+        const id = String((r && r.id) != null ? r.id : '');
+        if (id && seenRow.has(id)) return;
+        const cp = JSON.parse(JSON.stringify(r));
+        if (!cp.id) cp.id = nextId++;
+        rows.push(cp); seenRow.add(String(cp.id)); addedRows++;
+      });
+      const list = getArchives();
+      const seenArc = new Set(list.map(a => a.id));
+      (Array.isArray(obj.archives) ? obj.archives : []).map(normalizeArchive).filter(Boolean).forEach(a => {
+        if (seenArc.has(a.id)) return;
+        const cp = JSON.parse(JSON.stringify(a));
+        cp.id = cp.id || genArchiveId();
+        cp.source = 'import';
+        list.unshift(cp); seenArc.add(cp.id); addedArc++;
+      });
+      if (addedArc && !setArchives(list)) throw new Error('存档库写入失败（空间不足），行数据已合并但存档未写入');
+      const seenRef = new Set(modelRef.map(m => String(m.model || m.name || '')));
+      (Array.isArray(obj.modelRef) ? obj.modelRef : []).forEach(m => {
+        const key = String((m && (m.model || m.name)) || '');
+        if (key && seenRef.has(key)) return;
+        modelRef.push(JSON.parse(JSON.stringify(m)));
+        if (key) seenRef.add(key);
+        addedRef++;
+      });
+      if (addedRef) {
+        try { localStorage.setItem(REF_CACHE_KEY, JSON.stringify(modelRef)); localStorage.setItem(REF_CACHE_TIME_KEY, new Date().toISOString()); } catch(e){}
+        updateRefStatus('loaded', '合并对照表');
+      }
+      pushHistory();
+      render(); autoSave(); renderArchiveList();
+      showToast('已合并导入：新增 ' + addedRows + ' 行 / ' + addedArc + ' 个存档 / ' + addedRef + ' 个型号');
+    }
+    if (ghAutoSyncEnabled()) scheduleGhAutoSync();
+  } catch(err){
+    showToast('导入失败：' + ((err && err.message) || '未知错误'));
+  }
 }
 function exportArchives(list, single){
   if (!list.length) { showToast('暂无存档可导出'); return; }
@@ -2438,6 +2552,18 @@ document.getElementById('cmenuBtn').addEventListener('click', e => {
 });
 document.addEventListener('click', e => {
   if (!e.target.closest('#cmenuWrap')) hideCMenu();
+});
+// 整机数据备份下拉
+function hideDataBak() {
+  const p = document.getElementById('dataBakPanel');
+  if (p) p.classList.remove('show');
+}
+document.getElementById('dataBakBtn').addEventListener('click', e => {
+  e.stopPropagation();
+  document.getElementById('dataBakPanel').classList.toggle('show');
+});
+document.addEventListener('click', e => {
+  if (!e.target.closest('#dataBakWrap')) hideDataBak();
 });
 
 function checkAutoSave(onRestored, onSkipped) {
