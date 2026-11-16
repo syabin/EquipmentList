@@ -981,11 +981,11 @@ table.hide-nonessential .col-nameplate {
       <button class="btn btn-outline" onclick="closeCloudPanel()">关闭</button>
     </div>
     <div class="cloud-body">
-      <p class="cloud-note" style="margin-top:0">与任务管理器共用私有仓库 <code>syabin/task-data</code>，但数据放在另一个文件夹：<code>equipment-list/equipment-data.json</code>（任务管理器用 <code>data/task-data.json</code>），互不干扰。同步内容 = 当前工作区 + 项目存档 + 型号对照表 + 累计工时。</p>
+      <p class="cloud-note" style="margin-top:0">与任务管理器共用私有仓库 <code>syabin/task-data</code>，但数据放在另一个文件夹：<code>EquipmentList/equipment-data.json</code>（任务管理器用 <code>TaskManager/task-data.json</code>），互不干扰。同步内容 = 当前工作区 + 项目存档 + 型号对照表 + 累计工时。</p>
       <div class="cloud-form">
         <div class="cloud-form-row">
           <div class="cloud-form-group"><label>仓库（owner/repo）</label><input type="text" id="elGhRepo" value="syabin/task-data" autocomplete="off"></div>
-          <div class="cloud-form-group"><label>文件路径</label><input type="text" id="elGhPath" value="equipment-list/equipment-data.json" autocomplete="off"></div>
+          <div class="cloud-form-group"><label>文件路径</label><input type="text" id="elGhPath" value="EquipmentList/equipment-data.json" autocomplete="off"></div>
           <div class="cloud-form-group" style="max-width:130px"><label>分支</label><input type="text" id="elGhBranch" value="main" autocomplete="off"></div>
         </div>
         <div class="cloud-form-row">
@@ -1798,8 +1798,8 @@ function initArchiveSystem(){
 }
 
 // ========== GitHub 云端同步（Contents API） ==========
-// 与 TaskManager 同款：仓库 syabin/task-data，但数据放在 equipment-list/ 文件夹，
-// 与任务管理器的 data/task-data.json 互不干扰。含 PAT、sha 冲突保护、差异对比、自动静默上传。
+// 与 TaskManager 同款：仓库 syabin/task-data，但数据放在 EquipmentList/ 文件夹，
+// 与任务管理器的 TaskManager/task-data.json 互不干扰。含 PAT、sha 冲突保护、差异对比、自动静默上传。
 const EL_GH_CONFIG_KEY = 'el-gh-config';
 const EL_GH_TOKEN_KEY = 'el-gh-token';
 const EL_GH_SYNC_KEY = 'el-gh-sync';
@@ -1815,7 +1815,7 @@ function ghChecked(id){ const el = document.getElementById(id); return !!(el && 
 function ghConfig(){
   return {
     repo: ghVal('elGhRepo') || 'syabin/task-data',
-    path: ghVal('elGhPath') || 'equipment-list/equipment-data.json',
+    path: ghVal('elGhPath') || 'EquipmentList/equipment-data.json',
     branch: ghVal('elGhBranch') || 'main',
     includeArchives: ghChecked('elGhIncludeArchives'),
     includeRef: ghChecked('elGhIncludeRef'),
@@ -1835,9 +1835,14 @@ function ghSaveConfig(){
 function ghLoadConfig(){
   let cfg = {};
   try { cfg = JSON.parse(localStorage.getItem(EL_GH_CONFIG_KEY) || '{}'); } catch(e){}
+  // 一次性迁移：旧默认路径 equipment-list/ → EquipmentList/（仅当仍是旧默认值，尊重自定义路径）
+  if (cfg.path === 'equipment-list/equipment-data.json') {
+    cfg.path = 'EquipmentList/equipment-data.json';
+    try { localStorage.setItem(EL_GH_CONFIG_KEY, JSON.stringify(cfg)); } catch(e){}
+  }
   const fill = (id, def) => { const el = document.getElementById(id); if (el) el.value = cfg[id] || def; };
   fill('elGhRepo', 'syabin/task-data');
-  fill('elGhPath', 'equipment-list/equipment-data.json');
+  fill('elGhPath', 'EquipmentList/equipment-data.json');
   fill('elGhBranch', 'main');
   const chk = (id, def) => { const el = document.getElementById(id); if (el) el.checked = cfg[id] === undefined ? def : !!cfg[id]; };
   chk('elGhIncludeArchives', true);
@@ -1972,10 +1977,31 @@ function ghFileUrl(cfg, query){
   const enc = String(cfg.path).split('/').filter(Boolean).map(encodeURIComponent).join('/');
   return GH_API + '/repos/' + cfg.repo + '/contents/' + enc + (query || '');
 }
-async function ghFetchRemote(){
+// 通用读取：小文件走 Contents API；文件 >1MB 时 Contents API 只返回元数据
+// （content 为空、encoding "none"），必须按 sha 回退 Git Blobs API（支持到 100MB）。
+async function ghFetchFile(cfg, path, opts){
+  const metaOnly = !!(opts && opts.metaOnly); // 只要 sha 时不必下载正文（冲突检测用）
+  const enc = String(path).split('/').filter(Boolean).map(encodeURIComponent).join('/');
+  const j = await ghApi('GET', GH_API + '/repos/' + cfg.repo + '/contents/' + enc + '?ref=' + encodeURIComponent(cfg.branch));
+  if (Array.isArray(j)) throw new Error('路径 ' + path + ' 指向的是目录而非文件，请检查配置');
+  let text = '';
+  if (!metaOnly) {
+    if (j.encoding === 'base64' && j.content) {
+      text = ghB64Decode(j.content);
+    } else {
+      if (!j.sha) throw new Error('远端文件 ' + path + ' 缺少 sha，无法读取内容');
+      const blob = await ghApi('GET', GH_API + '/repos/' + cfg.repo + '/git/blobs/' + encodeURIComponent(j.sha));
+      if (!blob || blob.encoding !== 'base64' || typeof blob.content !== 'string') {
+        throw new Error('读取远端大文件失败（Blobs API 未返回内容）：' + path);
+      }
+      text = ghB64Decode(blob.content);
+    }
+  }
+  return { sha: j.sha, text: text, size: j.size || 0 };
+}
+async function ghFetchRemote(opts){
   const cfg = ghConfig();
-  const j = await ghApi('GET', ghFileUrl(cfg, '?ref=' + encodeURIComponent(cfg.branch)));
-  return { sha: j.sha, text: ghB64Decode(j.content || '') };
+  return ghFetchFile(cfg, cfg.path, opts);
 }
 async function ghTestConn(){
   ghSaveConfig();
@@ -1984,7 +2010,7 @@ async function ghTestConn(){
   try {
     const repo = await ghApi('GET', GH_API + '/repos/' + cfg.repo);
     let extra = '';
-    try { const r = await ghFetchRemote(); extra = '，数据文件 sha ' + r.sha.slice(0,7); }
+    try { const r = await ghFetchRemote({ metaOnly:true }); extra = '，数据文件 sha ' + r.sha.slice(0,7); }
     catch(e){ if (e.status !== 404) throw e; extra = '，远端暂无数据文件'; }
     setGhStatus('<span style="color:#16a34a;">连接正常：' + escAttr(repo.full_name) + '（' + (repo.private ? '私有' : '公开') + '）' + escAttr(extra) + '</span>');
     showToast('GitHub 连接正常');
@@ -1999,7 +2025,7 @@ async function ghUpload(opts){
   ghSaveConfig(); setGhBusy(true); setGhStatus('正在检查远端状态…');
   try {
     let remote = null;
-    try { remote = await ghFetchRemote(); } catch(e){ if (e.status !== 404) throw e; }
+    try { remote = await ghFetchRemote({ metaOnly:true }); } catch(e){ if (e.status !== 404) throw e; }
     const sync = ghGetSync();
     if (!force && remote && sync.sha && sync.sha !== remote.sha) {
       setGhStatus('<span style="color:#dc2626;font-weight:600;">检测到冲突，已拒绝覆盖（远端已被其他设备改动）</span>');
@@ -2043,7 +2069,11 @@ async function ghPull(){
     try { remote = await ghFetchRemote(); }
     catch(e){ if (e.status === 404) throw new Error('远端还没有数据文件，请先上传'); throw e; }
     let obj;
-    try { obj = JSON.parse(remote.text); } catch(e){ throw new Error('远端文件不是合法 JSON，已中止覆盖'); }
+    try { obj = JSON.parse(remote.text); }
+    catch(e){
+      const head = String(remote.text || '').replace(/\s+/g, ' ').slice(0, 120);
+      throw new Error('远端文件不是合法 JSON，已中止覆盖（远端 ' + Math.round((remote.size || 0) / 1024) + ' KB；内容开头：' + (head || '空') + '）');
+    }
     validateCloudData(obj);
     applyCloudData(obj);
     ghSetSync({ sha:remote.sha, syncedAt:new Date().toISOString(), localHash:ghLocalFingerprint() });
@@ -2092,7 +2122,11 @@ async function ghShowDiff(){
   }
   let obj;
   try { obj = JSON.parse(remote.text); }
-  catch(e){ showToast('远端文件不是合法 JSON，无法对比'); setGhStatus('远端文件解析失败'); return; }
+  catch(e){
+    const head = String(remote.text || '').replace(/\s+/g, ' ').slice(0, 120);
+    showToast('远端文件不是合法 JSON，无法对比（远端 ' + Math.round((remote.size || 0) / 1024) + ' KB；开头：' + (head || '空') + '）');
+    setGhStatus('远端文件解析失败'); return;
+  }
   const d = computeDataDiff(buildCloudData(false), obj);
   const sync = ghGetSync();
   const conflict = !!(sync.sha && sync.sha !== remote.sha);
