@@ -1164,8 +1164,9 @@ function startAutoSave() {
 const ARCHIVE_KEY = 'deviceList_archives';
 const ARCHIVE_VERSION = 2;
 const ARCHIVE_EXPORT_VERSION = 2;
-const ARCHIVE_MAX_BYTES = 4 * 1024 * 1024;      // localStorage 安全上限（约 5MB，留余量给暂存/对照表）
-const ARCHIVE_IMPORT_MAX_BYTES = 20 * 1024 * 1024;
+// 存档改存 IndexedDB：localStorage 只有约 5MB 硬上限，IndexedDB 通常有数百 MB 以上
+const ARCHIVE_DB_NAME = 'equipmentlist_archive_db';
+const ARCHIVE_DB_STORE = 'kv';
 const ARCHIVE_AUTO_KEEP = 5;                     // 自动快照保留份数
 const ARCHIVE_PAGE_SIZE = 20;
 const ARCHIVE_GROUP_PAGE_SIZE = 10;              // 分组视图每页文件夹数
@@ -1179,6 +1180,9 @@ let archiveSelected = new Set();
 let currentArchiveId = '';
 let lastAutoSnapshotAt = 0;
 let lastAutoSnapshotSig = '';
+let archivesCache = null;          // 内存镜像，保证 getArchives() 仍能同步返回
+let archivesWriteSeq = 0;          // 写序号，避免异步加载覆盖加载期间的新写入
+let archivePersistTimer = null;
 
 function genArchiveId(){ return 'arch_' + Date.now() + '_' + Math.random().toString(36).slice(2,8); }
 function bytesOf(str){ try { return new TextEncoder().encode(str).length; } catch(e){ return String(str).length * 2; } }
@@ -1214,28 +1218,94 @@ function normalizeArchive(a){
   item.size = Number(a.size) > 0 ? Number(a.size) : bytesOf(JSON.stringify(item));
   return item;
 }
-function getArchives(){
-  try {
-    const s = localStorage.getItem(ARCHIVE_KEY);
-    if (!s) return [];
-    const arr = JSON.parse(s);
-    if (!Array.isArray(arr)) return [];
-    return arr.map(normalizeArchive).filter(Boolean);
-  } catch(e){ console.warn('存档读取失败:', e); return []; }
+// ====== IndexedDB 存档存储（替代 localStorage 的 5MB 硬上限） ======
+function openArchiveDB(){
+  return new Promise((resolve, reject) => {
+    if (!window.indexedDB) { reject(new Error('IndexedDB 不可用')); return; }
+    const req = indexedDB.open(ARCHIVE_DB_NAME, 1);
+    req.onupgradeneeded = () => {
+      const db = req.result;
+      if (!db.objectStoreNames.contains(ARCHIVE_DB_STORE)) db.createObjectStore(ARCHIVE_DB_STORE);
+    };
+    req.onsuccess = () => resolve(req.result);
+    req.onerror = () => reject(req.error || new Error('IndexedDB 打开失败'));
+  });
 }
-// 写入前算体积；写入失败绝不改动已落盘数据（旧实现会静默丢数据）
+function idbReadArchives(){
+  return openArchiveDB().then(db => new Promise((resolve, reject) => {
+    const tx = db.transaction(ARCHIVE_DB_STORE, 'readonly');
+    const rq = tx.objectStore(ARCHIVE_DB_STORE).get(ARCHIVE_KEY);
+    rq.onsuccess = () => resolve(rq.result || null);
+    rq.onerror = () => reject(rq.error);
+  }));
+}
+function idbWriteArchives(arr){
+  return openArchiveDB().then(db => new Promise((resolve, reject) => {
+    const tx = db.transaction(ARCHIVE_DB_STORE, 'readwrite');
+    tx.objectStore(ARCHIVE_DB_STORE).put(arr, ARCHIVE_KEY);
+    tx.oncomplete = () => resolve();
+    tx.onerror = () => reject(tx.error);
+    tx.onabort = () => reject(tx.error || new Error('写入中断'));
+  }));
+}
+// 启动时加载：若库中还没有数据，把旧的 localStorage 存档迁过去并释放 localStorage 空间
+async function initArchiveStore(){
+  const seq = archivesWriteSeq;
+  let loaded = null;
+  try {
+    loaded = await idbReadArchives();
+    if (!loaded) {
+      const legacy = localStorage.getItem(ARCHIVE_KEY);
+      if (legacy) {
+        loaded = JSON.parse(legacy);
+        await idbWriteArchives(loaded);
+        localStorage.removeItem(ARCHIVE_KEY);
+      }
+    }
+  } catch(e){
+    console.warn('存档数据库读取失败，回退本地存储:', e);
+    try { loaded = JSON.parse(localStorage.getItem(ARCHIVE_KEY) || 'null'); } catch(err){ loaded = null; }
+  }
+  if (archivesWriteSeq === seq) {
+    archivesCache = Array.isArray(loaded) ? loaded.map(normalizeArchive).filter(Boolean) : [];
+    renderArchiveList();
+    updateArchiveQuota();
+  }
+}
+function persistArchivesNow(){
+  if (archivePersistTimer) { clearTimeout(archivePersistTimer); archivePersistTimer = null; }
+  if (!archivesCache) return;
+  idbWriteArchives(archivesCache).catch(err => {
+    console.warn('存档写入失败:', err);
+    showToast('存档写入失败，请检查浏览器存储权限');
+  });
+}
+function scheduleArchivePersist(){
+  if (archivePersistTimer) clearTimeout(archivePersistTimer);
+  archivePersistTimer = setTimeout(persistArchivesNow, 200);
+}
+window.addEventListener('pagehide', persistArchivesNow);
+document.addEventListener('visibilitychange', () => { if (document.hidden) persistArchivesNow(); });
+
+function getArchives(){
+  if (!archivesCache) {
+    // 首次同步读取：先用旧 localStorage 兜底，异步加载完成后由 IndexedDB 覆盖
+    let arr = [];
+    try { arr = JSON.parse(localStorage.getItem(ARCHIVE_KEY) || '[]'); } catch(e){}
+    archivesCache = Array.isArray(arr) ? arr.map(normalizeArchive).filter(Boolean) : [];
+  }
+  return archivesCache;
+}
+// 同步更新内存镜像，异步落盘到 IndexedDB；不再有 4MB 上限
 function setArchives(arr){
   try {
-    const str = JSON.stringify(arr);
-    if (bytesOf(str) > ARCHIVE_MAX_BYTES) {
-      showToast('存档库将超过 ' + formatBytes(ARCHIVE_MAX_BYTES) + ' 上限，请先删旧存档或导出备份');
-      return false;
-    }
-    localStorage.setItem(ARCHIVE_KEY, str);
+    archivesCache = Array.isArray(arr) ? arr.map(normalizeArchive).filter(Boolean) : [];
+    archivesWriteSeq++;
+    scheduleArchivePersist();
     updateArchiveQuota();
     return true;
   } catch(e){
-    showToast('存档保存失败（浏览器存储不足），原有存档未改动');
+    showToast('存档保存失败，原有存档未改动');
     console.warn('存档写入失败:', e);
     return false;
   }
@@ -1244,10 +1314,9 @@ function updateArchiveQuota(){
   const el = document.getElementById('archiveQuota');
   if (!el) return;
   let size = 0;
-  try { size = bytesOf(localStorage.getItem(ARCHIVE_KEY) || ''); } catch(e){}
-  const pct = Math.round(size / ARCHIVE_MAX_BYTES * 100);
-  el.textContent = '占用 ' + formatBytes(size) + ' / ' + formatBytes(ARCHIVE_MAX_BYTES) + '（' + pct + '%）';
-  el.className = 'archive-quota' + (pct >= 80 ? ' warn' : '');
+  try { size = bytesOf(JSON.stringify(getArchives())); } catch(e){}
+  el.textContent = '占用 ' + formatBytes(size) + '（本地数据库，无大小限制）';
+  el.className = 'archive-quota';
 }
 
 function buildArchive(name, note, kind, source){
@@ -1532,7 +1601,6 @@ function importFullData(e){
   const file = e.target.files[0];
   e.target.value = '';
   if (!file) return;
-  if (file.size > ARCHIVE_IMPORT_MAX_BYTES) { showToast('导入文件超过 20MB，已中止'); return; }
   const reader = new FileReader();
   reader.onload = function(ev){
     let obj;
@@ -1643,7 +1711,6 @@ function exportOneArchive(id){
 function importArchives(e){
   const file = e.target.files[0];
   if (!file) return;
-  if (file.size > ARCHIVE_IMPORT_MAX_BYTES) { showToast('导入文件超过 20MB，已中止'); e.target.value = ''; return; }
   const reader = new FileReader();
   reader.onload = function(ev){
     let data;
@@ -4557,6 +4624,7 @@ function clearContracts() {
   }, { passive: true });
 
   // 存档系统 / 云同步初始化（事件委托、配置回填、配额显示、自动同步状态）
+  initArchiveStore();
   initArchiveSystem();
 })();
 
