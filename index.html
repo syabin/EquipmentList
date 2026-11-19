@@ -181,6 +181,7 @@ body {
   position: relative;
 }
 .vs-spacer { visibility: hidden; pointer-events: none; }
+.vs-spacer td { height: inherit; padding: 0; border: 0; line-height: 0; font-size: 0; }
 .end-hint { text-align: center; color: #94a3b8; font-size: 13px; padding: 12px 0; user-select: none; }
 
 table {
@@ -302,7 +303,7 @@ tbody td:last-child { border-right: none; }
   align-items: center;
   justify-content: center;
   height: 100%;
-  min-height: 36px;
+  min-height: var(--row-min-height);
   font-size: 12px;
   color: var(--text-secondary);
   font-weight: 500;
@@ -316,7 +317,7 @@ tbody td:last-child { border-right: none; }
   align-items: center;
   justify-content: center;
   height: 100%;
-  min-height: 36px;
+  min-height: var(--row-min-height);
 }
 
 .check-cell input[type="checkbox"] {
@@ -724,10 +725,22 @@ table.hide-nonessential .col-nameplate {
 .undo-toast{position:fixed;left:50%;bottom:28px;transform:translateX(-50%);background:#1e293b;color:#fff;padding:10px 14px;border-radius:8px;box-shadow:0 10px 30px rgba(15,23,42,0.3);z-index:300;display:flex;gap:12px;align-items:center;font-size:12px;max-width:90vw}
 .undo-toast .btn{font-size:11px;padding:3px 10px}
 
-/* 表头批量按钮（工序列） */
-.th-batch-btn{border:none;background:transparent;color:var(--primary);font-size:11px;cursor:pointer;padding:0 2px;line-height:1;vertical-align:middle}
-.th-batch-btn:hover{text-decoration:underline}
-.th-batch-btn:focus{outline:1px solid var(--primary);border-radius:2px}
+/* 表头 Excel 式筛选按钮 */
+.th-filter-btn{border:1px solid transparent;background:transparent;color:#94a3b8;font-size:12px;line-height:1;cursor:pointer;padding:1px 3px;margin-left:4px;border-radius:3px;vertical-align:middle}
+.th-filter-btn:hover{color:var(--primary);border-color:var(--border);background:#f8fafc}
+.th-filter-btn.active{color:#fff;background:var(--primary);border-color:var(--primary)}
+.col-filter-panel{position:fixed;z-index:400;width:250px;background:#fff;border:1px solid var(--border);border-radius:8px;box-shadow:0 12px 32px rgba(15,23,42,.18);padding:10px;font-size:12px;color:var(--text)}
+.col-filter-panel .cf-title{font-weight:600;margin-bottom:8px;color:var(--text)}
+.col-filter-panel .cf-search{width:100%;height:28px;border:1px solid var(--border);border-radius:5px;padding:0 8px;font-size:12px;box-sizing:border-box;margin-bottom:6px}
+.col-filter-panel .cf-tools{display:flex;justify-content:space-between;align-items:center;padding:4px 0 8px;border-bottom:1px solid var(--border);color:var(--text-secondary)}
+.col-filter-panel .cf-tools label{cursor:pointer;user-select:none}
+.col-filter-panel .cf-clear{border:none;background:none;color:var(--primary);cursor:pointer;font-size:12px;padding:0}
+.col-filter-panel .cf-list{max-height:260px;overflow:auto;padding:6px 0}
+.col-filter-panel .cf-item{display:flex;align-items:center;gap:6px;padding:4px 2px;cursor:pointer;border-radius:4px}
+.col-filter-panel .cf-item:hover{background:#f1f5f9}
+.col-filter-panel .cf-item span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.col-filter-panel .cf-empty{color:var(--text-muted);padding:10px 2px}
+.col-filter-panel .cf-footer{display:flex;justify-content:flex-end;gap:8px;border-top:1px solid var(--border);padding-top:8px}
 
 /* 按钮分组 */
 .btn-group{display:flex;gap:0}
@@ -798,7 +811,6 @@ table.hide-nonessential .col-nameplate {
         <input type="file" id="fullDataImportFile" accept=".json" style="display:none" onchange="importFullData(event)">
       </div>
     </div>
-    <button class="btn btn-success" onclick="saveExcel()">💾 保存</button>
     <button class="btn btn-outline" onclick="exportExcel()">📤 导出</button>
   </div>
 </div>
@@ -875,7 +887,7 @@ table.hide-nonessential .col-nameplate {
         <th class="col-submodel">补充型号</th>
         <th class="col-attr">属性</th>
         <th class="col-block">撬块归属</th>
-        <th class="col-process">工序 <button class="th-batch-btn" onclick="openProcessBatch()" title="批量修改勾选行的工序（覆盖 / 仅填空 / 清空）">▾</button></th>
+        <th class="col-process">工序</th>
         <th class="col-note">设计备注</th>
         <th class="col-qty">数量</th>
         <th class="col-purchase">是否整机外购</th>
@@ -895,7 +907,7 @@ table.hide-nonessential .col-nameplate {
     <tbody id="tableBody" class="line-group-wrap"></tbody>
   </table>
   <div class="end-hint">文档已经到底了</div>
-  <div style="height:190px"></div>
+  <div style="height:24px"></div>
 </div>
 
 <div class="autocomplete" id="autocomplete"></div>
@@ -1030,6 +1042,15 @@ table.hide-nonessential .col-nameplate {
 </div>
 <div id="undoToastHost"></div>
 
+<!-- 表头 Excel 式列筛选浮层 -->
+<div class="col-filter-panel" id="colFilterPanel" style="display:none">
+  <div class="cf-title" id="cfTitle">筛选</div>
+  <input type="text" class="cf-search" id="cfSearch" placeholder="搜索值…" autocomplete="off">
+  <div class="cf-tools"><label><input type="checkbox" id="cfAll"> 全选</label><button type="button" class="cf-clear" id="cfClear">清除筛选</button></div>
+  <div class="cf-list" id="cfList"></div>
+  <div class="cf-footer"><button type="button" class="btn btn-outline" id="cfCancel">取消</button><button type="button" class="btn btn-primary" id="cfApply">确定</button></div>
+</div>
+
 <script>
 // ========== Data ==========
 let modelRef = [];
@@ -1038,7 +1059,11 @@ let nextId = 1;
 let lastClickedRowId = null;
 let renderVersion = 0;
 let filterText = '';
-const ROW_HEIGHT = 38;
+let columnFilters = {};   // 每列表头筛选：field -> Set(允许显示的值)
+// 行高由实际渲染结果测量得到（密度切换时会变化），不再写死 38px
+let ROW_HEIGHT = 38;
+let tableEventsBound = false;
+let vsWindow = { start: -1, end: -1, total: -1, filter: '', density: '' };
 
 const ATTRS = ["3D-UT管道","3D-支架","3D-液体管道","3D-粉体管道","DCR","EE-桥架","EE-电控系统","EE-线缆","LSU-UT元件","LSU-外购","LSU-工程外包","LSU-液体元件","LSU-粉体元件","LSU-缺失","ME-制胶机","ME-外购","ME-搅拌机","PSU-外购","PSU-撬块","PSU-液体单机","PSU-粉体单机","PSU-钢结构","SE-上位机"];
 const DEPTS = ["EC-单机","EE","LSU","ME","PSU","SE","3D"];
@@ -1420,7 +1445,7 @@ function loadArchive(id){
     timerElapsed = arch.timerElapsed || 0;
     updateTimerDisplay(); saveTimerState();
     redoStack = [];
-    filterText = '';
+    filterText = ''; columnFilters = {};
     const fi = document.getElementById('filterInput'); if (fi) fi.value = '';
     const tw = document.querySelector('.table-wrapper'); if (tw) tw.scrollTop = 0;
     currentArchiveId = arch.id;
@@ -1556,7 +1581,7 @@ function doImportFullData(obj, mode){
         currentArchiveId = '';
       }
       undoStack = []; redoStack = []; updateUndoUI();
-      filterText = '';
+      filterText = ''; columnFilters = {};
       const fi = document.getElementById('filterInput'); if (fi) fi.value = '';
       render(); autoSave(); renderArchiveList();
       showToast('数据已覆盖导入：' + rows.length + ' 行 / ' + getArchives().length + ' 个存档');
@@ -1954,18 +1979,19 @@ function ghLoadConfig(){
     cfg.path = 'EquipmentList/equipment-data.json';
     try { localStorage.setItem(EL_GH_CONFIG_KEY, JSON.stringify(cfg)); } catch(e){}
   }
-  const fill = (id, def) => { const el = document.getElementById(id); if (el) el.value = cfg[id] || def; };
-  fill('elGhRepo', 'syabin/task-data');
-  fill('elGhPath', 'EquipmentList/equipment-data.json');
-  fill('elGhBranch', 'main');
-  const chk = (id, def) => { const el = document.getElementById(id); if (el) el.checked = cfg[id] === undefined ? def : !!cfg[id]; };
-  chk('elGhIncludeArchives', true);
-  chk('elGhIncludeRef', true);
-  chk('elGhAutoSync', false);
+  // 保存时用的是短键名（repo/path/branch/includeArchives/...），读取时必须对应，否则设置不会被记住
+  const fill = (id, key, def) => { const el = document.getElementById(id); if (el) el.value = cfg[key] || def; };
+  fill('elGhRepo', 'repo', 'syabin/task-data');
+  fill('elGhPath', 'path', 'EquipmentList/equipment-data.json');
+  fill('elGhBranch', 'branch', 'main');
+  const chk = (id, key, def) => { const el = document.getElementById(id); if (el) el.checked = cfg[key] === undefined ? def : !!cfg[key]; };
+  chk('elGhIncludeArchives', 'includeArchives', true);
+  chk('elGhIncludeRef', 'includeRef', true);
+  chk('elGhAutoSync', 'autoSync', false);
   let tok = '';
   try { tok = localStorage.getItem(EL_GH_TOKEN_KEY) || ''; } catch(e){}
   const t = document.getElementById('elGhToken'); if (t) t.value = tok;
-  const r = document.getElementById('elGhRemember'); if (r) r.checked = !!tok;
+  const r = document.getElementById('elGhRemember'); if (r) r.checked = !!tok && cfg.remember !== false;
   updateGhStatus();
   if (ghAutoSyncEnabled()) ghRestoreAutoStatus(); else ghSetAutoStatus('', '');
 }
@@ -2023,7 +2049,7 @@ function applyCloudData(obj){
       currentArchiveId = '';
     }
     redoStack = [];
-    filterText = '';
+    filterText = ''; columnFilters = {};
     const fi = document.getElementById('filterInput'); if (fi) fi.value = '';
     const tw = document.querySelector('.table-wrapper'); if (tw) tw.scrollTop = 0;
     render(); autoSave(); renderArchiveList();
@@ -2744,11 +2770,7 @@ function disableAutofill(root){
 
 // 与 render() 相同的显示顺序（筛选后的行），供方向键上下移动使用
 function getDisplayRows(){
-  let list = rows;
-  const q = filterText.toLowerCase();
-  const f = document.getElementById('filterField') ? document.getElementById('filterField').value : '';
-  if (filterText) list = rows.filter(r => matchFilter(r, f, q));
-  return list;
+  return getFilteredRows();
 }
 // 滚动到目标行 → 重绘虚拟表格 → 聚焦目标格子
 function focusCell(rowId, field){
@@ -2830,90 +2852,102 @@ function handleCellArrow(e){
   return true;
 }
 
-function render() {
+// 从实际渲染结果测量行高：切换行密度后，虚拟占位的高度必须跟着变，否则会错位/留白
+function syncRowHeight() {
+  const probe = document.querySelector('#tableBody tr[data-id]');
+  if (!probe) return;
+  const h = probe.getBoundingClientRect().height;
+  if (h > 0) ROW_HEIGHT = h;
+}
+
+// 防自动填充标记直接写进 HTML，避免每次重绘后再遍历上千个节点逐个设置属性
+function cellAttrs(field, id) {
+  return `autocomplete="off" data-lpignore="true" data-1p-ignore="" data-bwignore="" data-form-type="other" spellcheck="false" name="el_${field}_${id}"`;
+}
+
+function render(opts) {
   renderVersion++;
+  const scrollOnly = !!(opts && opts.scrollOnly);
   const tbody = document.getElementById('tableBody');
   const currentYear = new Date().getFullYear();
   const wrapper = document.querySelector('.table-wrapper');
+  syncRowHeight();
 
-  let displayRows = rows;
+  let displayRows = getFilteredRows();
   const q = filterText.toLowerCase();
   const f = document.getElementById('filterField') ? document.getElementById('filterField').value : '';
-  if (filterText) {
-    displayRows = rows.filter(r => matchFilter(r, f, q));
-  }
 
   const total = displayRows.length;
   const viewH = wrapper ? wrapper.clientHeight : window.innerHeight;
-  let scrollTop = wrapper ? wrapper.scrollTop : 0;
-  // Clamp scroll to valid range (prevents blank area after filtering)
-  // Allow scrolling 10 extra rows past the last data row
-  if (wrapper && total * ROW_HEIGHT > 0 && scrollTop > (total + 10) * ROW_HEIGHT - viewH) {
-    wrapper.scrollTop = Math.max(0, (total + 10) * ROW_HEIGHT - viewH);
-    scrollTop = wrapper.scrollTop;
-  }
+  const scrollTop = wrapper ? wrapper.scrollTop : 0;
   const BUFFER = 8;
   const MIN_VISIBLE = 20;
   const startIdx = Math.max(0, Math.floor(scrollTop / ROW_HEIGHT) - BUFFER);
   let endIdx = Math.min(total, Math.ceil((scrollTop + viewH) / ROW_HEIGHT) + BUFFER);
-  // Ensure at least MIN_VISIBLE rows are rendered (fixes restore-after-modal issue)
   if (endIdx - startIdx < MIN_VISIBLE && total >= MIN_VISIBLE) {
     endIdx = Math.min(total, startIdx + MIN_VISIBLE);
   }
 
-  const lineGroups = [];
-  for (let i = startIdx; i < endIdx && i < total; i++) {
-    if (displayRows[i].line) {
-      lineGroups.push(parseInt(displayRows[i].line));
-    } else {
-      lineGroups.push(-1);
-    }
-  }
+  // 滚动时只有可见窗口真正变化才重建 DOM；微小滚动直接跳过，scroll 不再卡顿
+  const density = getComputedStyle(document.documentElement).getPropertyValue('--row-min-height');
+  const winKey = `${q}|${f}|${density}|${total}|${startIdx}|${endIdx}`;
+  if (scrollOnly && vsWindow.key === winKey) return;
+  vsWindow.key = winKey;
 
-  let html = '';
-  html += `<tr class="vs-spacer" style="height:${startIdx * ROW_HEIGHT}px"></tr>`;
+  let html = `<tr class="vs-spacer" style="height:${startIdx * ROW_HEIGHT}px"><td colspan="28"></td></tr>`;
 
   for (let i = startIdx; i < endIdx && i < total; i++) {
     const r = displayRows[i];
-    const gi = lineGroups[i - startIdx];
+    const gi = r.line ? parseInt(r.line) : -1;
     const groupClass = gi >= 0 ? ` line-group-${((gi - 1) % 6 + 6) % 6}` : '';
     html += `<tr data-id="${r.id}" data-idx="${i}" class="${r.selected ? 'selected' : ''}${groupClass}">`;
-    html += `<td class="check-cell"><input type="checkbox" ${r.selected ? 'checked' : ''} data-id="${r.id}"></td>`;
+    html += `<td class="check-cell"><input type="checkbox" ${r.selected ? 'checked' : ''} data-id="${r.id}" ${cellAttrs('check', r.id)}></td>`;
     html += `<td class="col-drag"><div class="drag-handle" draggable="true" title="拖拽移动（Ctrl+拖拽=复制）">⠿</div></td>`;
     html += `<td class="col-seq"><div class="row-num">${i + 1}</div></td>`;
-    html += `<td class="col-year"><input class="cell-input number" type="number" value="${r.year || currentYear}" data-field="year" data-id="${r.id}"></td>`;
-    html += `<td class="col-project"><input class="cell-input" value="${esc(r.projectNo)}" data-field="projectNo" data-id="${r.id}" placeholder="项目号"></td>`;
-    html += `<td class="col-vcode"><input class="cell-input" value="${esc(r.virtualCode)}" data-field="virtualCode" data-id="${r.id}" placeholder="虚拟码"></td>`;
-    html += `<td class="col-contract"><input class="cell-input" value="${esc(r.contractNo)}" data-field="contractNo" data-id="${r.id}" placeholder="合同号"></td>`;
-    html += `<td class="col-name"><input class="cell-input" value="${esc(r.equipName)}" data-field="equipName" data-id="${r.id}" placeholder="自动填充"></td>`;
-    html += `<td class="col-model"><div class="model-input-wrap"><input class="cell-input" value="${esc(r.model)}" data-field="model" data-id="${r.id}" placeholder="输入型号或名称搜索..." autocomplete="off"></div></td>`;
-    html += `<td class="col-submodel"><input class="cell-input" value="${esc(r.subModel)}" data-field="subModel" data-id="${r.id}" placeholder="补充型号"></td>`;
+    html += `<td class="col-year"><input class="cell-input number" type="number" value="${r.year || currentYear}" data-field="year" data-id="${r.id}" ${cellAttrs('year', r.id)}></td>`;
+    html += `<td class="col-project"><input class="cell-input" value="${esc(r.projectNo)}" data-field="projectNo" data-id="${r.id}" placeholder="项目号" ${cellAttrs('projectNo', r.id)}></td>`;
+    html += `<td class="col-vcode"><input class="cell-input" value="${esc(r.virtualCode)}" data-field="virtualCode" data-id="${r.id}" placeholder="虚拟码" ${cellAttrs('virtualCode', r.id)}></td>`;
+    html += `<td class="col-contract"><input class="cell-input" value="${esc(r.contractNo)}" data-field="contractNo" data-id="${r.id}" placeholder="合同号" ${cellAttrs('contractNo', r.id)}></td>`;
+    html += `<td class="col-name"><input class="cell-input" value="${esc(r.equipName)}" data-field="equipName" data-id="${r.id}" placeholder="自动填充" ${cellAttrs('equipName', r.id)}></td>`;
+    html += `<td class="col-model"><div class="model-input-wrap"><input class="cell-input" value="${esc(r.model)}" data-field="model" data-id="${r.id}" placeholder="输入型号或名称搜索..." ${cellAttrs('model', r.id)}></div></td>`;
+    html += `<td class="col-submodel"><input class="cell-input" value="${esc(r.subModel)}" data-field="subModel" data-id="${r.id}" placeholder="补充型号" ${cellAttrs('subModel', r.id)}></td>`;
     html += `<td class="col-attr">${selectHtml('attr', r.id, r.attr, ATTRS)}</td>`;
-    html += `<td class="col-block"><input class="cell-input" value="${esc(r.blockOwner)}" data-field="blockOwner" data-id="${r.id}" placeholder="撬块归属"></td>`;
-    html += `<td class="col-process"><input class="cell-input" value="${esc(r.process)}" data-field="process" data-id="${r.id}" placeholder="工序"></td>`;
-    html += `<td class="col-note"><input class="cell-input" value="${esc(r.designNote)}" data-field="designNote" data-id="${r.id}" placeholder="设计备注"></td>`;
-    html += `<td class="col-qty"><input class="cell-input number" type="number" min="1" value="${r.qty || 1}" data-field="qty" data-id="${r.id}"></td>`;
+    html += `<td class="col-block"><input class="cell-input" value="${esc(r.blockOwner)}" data-field="blockOwner" data-id="${r.id}" placeholder="撬块归属" ${cellAttrs('blockOwner', r.id)}></td>`;
+    html += `<td class="col-process"><input class="cell-input" value="${esc(r.process)}" data-field="process" data-id="${r.id}" placeholder="工序" ${cellAttrs('process', r.id)}></td>`;
+    html += `<td class="col-note"><input class="cell-input" value="${esc(r.designNote)}" data-field="designNote" data-id="${r.id}" placeholder="设计备注" ${cellAttrs('designNote', r.id)}></td>`;
+    html += `<td class="col-qty"><input class="cell-input number" type="number" min="1" value="${r.qty || 1}" data-field="qty" data-id="${r.id}" ${cellAttrs('qty', r.id)}></td>`;
     html += `<td class="col-purchase">${selectHtml('purchase', r.id, r.purchase, PURCHASES)}</td>`;
-    html += `<td class="col-pos"><input class="cell-input" value="${esc(r.position)}" data-field="position" data-id="${r.id}" placeholder="位置"></td>`;
+    html += `<td class="col-pos"><input class="cell-input" value="${esc(r.position)}" data-field="position" data-id="${r.id}" placeholder="位置" ${cellAttrs('position', r.id)}></td>`;
     html += `<td class="col-contract-attr">${selectHtml('contractAttr', r.id, r.contractAttr, CONTRACT_ATTRS)}</td>`;
     html += `<td class="col-biz">${selectHtml('biz', r.id, r.biz, BIZS)}</td>`;
     html += `<td class="col-dept">${selectHtml('dept', r.id, r.dept, DEPTS)}</td>`;
     html += `<td class="col-paint">${selectHtml('paint', r.id, r.paint, PAINTS)}</td>`;
     html += `<td class="col-nameplate">${selectHtml('nameplate', r.id, r.nameplate, NAMEPLATES)}</td>`;
-    html += `<td class="col-line"><input class="cell-input number" type="number" min="1" value="${r.line || ''}" data-field="line" data-id="${r.id}" placeholder="条线"></td>`;
-    html += `<td class="col-mainEquip"><input class="cell-input" value="${esc(r.mainEquip)}" data-field="mainEquip" data-id="${r.id}" placeholder="主设备"></td>`;
-    html += `<td class="col-matchMark"><input class="cell-input" value="${esc(r.matchMark)}" data-field="matchMark" data-id="${r.id}" placeholder="配套标识"></td>`;
-    html += `<td class="col-special"><input class="cell-input" value="${esc(r.specialMark)}" data-field="specialMark" data-id="${r.id}" placeholder="特殊标记"></td>`;
+    html += `<td class="col-line"><input class="cell-input number" type="number" min="1" value="${r.line || ''}" data-field="line" data-id="${r.id}" placeholder="条线" ${cellAttrs('line', r.id)}></td>`;
+    html += `<td class="col-mainEquip"><input class="cell-input" value="${esc(r.mainEquip)}" data-field="mainEquip" data-id="${r.id}" placeholder="主设备" ${cellAttrs('mainEquip', r.id)}></td>`;
+    html += `<td class="col-matchMark"><input class="cell-input" value="${esc(r.matchMark)}" data-field="matchMark" data-id="${r.id}" placeholder="配套标识" ${cellAttrs('matchMark', r.id)}></td>`;
+    html += `<td class="col-special"><input class="cell-input" value="${esc(r.specialMark)}" data-field="specialMark" data-id="${r.id}" placeholder="特殊标记" ${cellAttrs('specialMark', r.id)}></td>`;
     html += `<td class="col-del"><button class="btn btn-danger" style="padding:4px 8px;font-size:11px" onclick="deleteRow(${r.id})" title="删除此行">&times;</button></td>`;
     html += '</tr>';
   }
 
-  html += `<tr class="vs-spacer" style="height:${Math.max(0, (total - endIdx) * ROW_HEIGHT) + 4 * ROW_HEIGHT}px"></tr>`;
+  // 占位高度严格等于未渲染行数，不再额外加 4 行空白
+  html += `<tr class="vs-spacer" style="height:${Math.max(0, (total - endIdx) * ROW_HEIGHT)}px"><td colspan="28"></td></tr>`;
 
   tbody.innerHTML = html;
-  updateInfo();
-  bindEvents();
-  disableAutofill(tbody);   // 每次重绘都压住浏览器/密码管理器的自动填充浮层
+  bindEvents();   // 仅在首次绑定；后续重绘靠事件委托，不再重复挂监听
+
+  // 首次渲染后才知道真实行高；若与预估值不一致，校准占位后重排一次
+  const probe = tbody.querySelector('tr[data-id]');
+  if (probe) {
+    const h = probe.getBoundingClientRect().height;
+    if (h > 0 && Math.abs(h - ROW_HEIGHT) > 0.5 && !(opts && opts.heightFixed)) {
+      ROW_HEIGHT = h;
+      vsWindow.key = '';
+      return render({ scrollOnly: scrollOnly, heightFixed: true });
+    }
+  }
+  if (!scrollOnly) { updateHeaderFilterMarks(); updateInfo(); }
 }
 
 function selectHtml(field, id, value, options) {
@@ -2936,10 +2970,9 @@ function updateInfo() {
   document.getElementById('selectedCount').textContent = rows.filter(r => r.selected).length;
   const fc = document.getElementById('filterCount');
   const fcb = document.getElementById('filterClear');
-  if (filterText) {
-    const q = filterText.toLowerCase();
-    const f = document.getElementById('filterField').value;
-    const visible = rows.filter(r => matchFilter(r, f, q)).length;
+  const hasFilter = !!filterText || Object.keys(columnFilters).length > 0;
+  if (hasFilter) {
+    const visible = getFilteredRows().length;
     fc.textContent = `匹配 ${visible} / ${rows.length}`;
     fcb.style.display = '';
   } else {
@@ -2959,6 +2992,135 @@ function matchFilter(r, field, q) {
     if (String(r[k] || '').toLowerCase().includes(q)) return true;
   }
   return false;
+}
+
+// 表头列筛选：多列之间取交集，并与顶部关键词筛选叠加
+function matchesColumnFilters(r) {
+  for (const field in columnFilters) {
+    const allowed = columnFilters[field];
+    if (!allowed) continue;
+    const v = String(r[field] == null ? '' : r[field]);
+    if (!allowed.has(v)) return false;
+  }
+  return true;
+}
+function getFilteredRows() {
+  let list = rows;
+  const q = filterText.toLowerCase();
+  const f = document.getElementById('filterField') ? document.getElementById('filterField').value : '';
+  if (filterText) list = list.filter(r => matchFilter(r, f, q));
+  if (Object.keys(columnFilters).length) list = list.filter(matchesColumnFilters);
+  return list;
+}
+
+// ========== 表头 Excel 式列筛选 ==========
+const COLUMN_FIELDS = [
+  'year','projectNo','virtualCode','contractNo','equipName','model','subModel','attr',
+  'blockOwner','process','designNote','qty','purchase','position','contractAttr','biz',
+  'dept','paint','nameplate','line','mainEquip','matchMark','specialMark'
+];
+const COLUMN_LABELS = {
+  year:'年份', projectNo:'项目号', virtualCode:'虚拟码', contractNo:'合同号', equipName:'设备名称',
+  model:'型号', subModel:'补充型号', attr:'属性', blockOwner:'撬块归属', process:'工序',
+  designNote:'设计备注', qty:'数量', purchase:'是否整机外购', position:'位置', contractAttr:'合同属性',
+  biz:'业务归属', dept:'责任部门', paint:'油漆', nameplate:'铭牌', line:'条线',
+  mainEquip:'主设备', matchMark:'配套标识', specialMark:'特殊标记'
+};
+let cfField = null;
+let cfAllValues = [];
+
+function updateHeaderFilterMarks() {
+  document.querySelectorAll('.th-filter-btn').forEach(b => {
+    b.classList.toggle('active', !!columnFilters[b.dataset.field]);
+  });
+}
+function initColumnFilterButtons() {
+  const ths = document.querySelectorAll('thead th');
+  COLUMN_FIELDS.forEach((field, i) => {
+    const th = ths[i + 3]; // 前 3 列是复选框 / 拖拽 / 序号
+    if (!th) return;
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'th-filter-btn';
+    btn.dataset.field = field;
+    btn.textContent = '▾';
+    btn.title = '筛选：' + (COLUMN_LABELS[field] || field);
+    th.appendChild(btn);
+  });
+  const panel = document.getElementById('colFilterPanel');
+  document.getElementById('cfSearch').addEventListener('input', renderColumnFilterList);
+  document.getElementById('cfAll').addEventListener('change', e => {
+    panel.querySelectorAll('.cf-item input').forEach(cb => { cb.checked = e.target.checked; });
+  });
+  document.getElementById('cfApply').addEventListener('click', applyColumnFilter);
+  document.getElementById('cfCancel').addEventListener('click', closeColumnFilter);
+  document.getElementById('cfClear').addEventListener('click', () => {
+    if (!cfField) return;
+    delete columnFilters[cfField];
+    closeColumnFilter();
+    updateHeaderFilterMarks();
+    const tw = document.querySelector('.table-wrapper'); if (tw) tw.scrollTop = 0;
+    render();
+  });
+}
+function openColumnFilter(field, btn) {
+  cfField = field;
+  cfAllValues = Array.from(new Set(rows.map(r => String(r[field] == null ? '' : r[field]))))
+    .sort((a, b) => a.localeCompare(b, 'zh-CN'));
+  const panel = document.getElementById('colFilterPanel');
+  document.getElementById('cfTitle').textContent = '筛选：' + (COLUMN_LABELS[field] || field);
+  document.getElementById('cfSearch').value = '';
+  panel.style.display = 'block';
+  const rect = btn.getBoundingClientRect();
+  panel.style.left = Math.max(8, Math.min(window.innerWidth - 262, rect.left)) + 'px';
+  panel.style.top = Math.max(8, Math.min(window.innerHeight - 430, rect.bottom + 4)) + 'px';
+  renderColumnFilterList();
+}
+function renderColumnFilterList() {
+  if (!cfField) return;
+  const panel = document.getElementById('colFilterPanel');
+  const list = document.getElementById('cfList');
+  const kw = document.getElementById('cfSearch').value.trim().toLowerCase();
+  const allowed = columnFilters[cfField];
+  list.innerHTML = '';
+  let shown = 0;
+  cfAllValues.forEach(v => {
+    if (kw && v.toLowerCase().indexOf(kw) < 0) return;
+    shown++;
+    const label = document.createElement('label');
+    label.className = 'cf-item';
+    const cb = document.createElement('input');
+    cb.type = 'checkbox';
+    cb.value = v;
+    cb.checked = !allowed || allowed.has(v);
+    const span = document.createElement('span');
+    span.textContent = v === '' ? '(空白)' : v;
+    span.title = v;
+    label.appendChild(cb);
+    label.appendChild(span);
+    list.appendChild(label);
+  });
+  if (!shown) list.innerHTML = '<div class="cf-empty">无匹配值</div>';
+  const all = panel.querySelectorAll('.cf-item input');
+  const checked = panel.querySelectorAll('.cf-item input:checked');
+  const cbAll = document.getElementById('cfAll');
+  cbAll.checked = all.length > 0 && checked.length === all.length;
+  cbAll.indeterminate = checked.length > 0 && checked.length < all.length;
+}
+function closeColumnFilter() {
+  document.getElementById('colFilterPanel').style.display = 'none';
+  cfField = null;
+}
+function applyColumnFilter() {
+  if (!cfField) return;
+  const panel = document.getElementById('colFilterPanel');
+  const checked = Array.prototype.map.call(panel.querySelectorAll('.cf-item input:checked'), cb => cb.value);
+  if (checked.length === cfAllValues.length) delete columnFilters[cfField];
+  else columnFilters[cfField] = new Set(checked);
+  closeColumnFilter();
+  updateHeaderFilterMarks();
+  const tw = document.querySelector('.table-wrapper'); if (tw) tw.scrollTop = 0;
+  render();
 }
 
 // ========== Row operations ==========
@@ -3134,131 +3296,38 @@ function applyProcessBatch(){
   return true;
 }
 
-// Track which cell was last focused
+// 批量填写只作用于当前屏幕上实际显示的选中行（虚拟滚动未渲染的行不受影响）
+function getVisibleSelectedRows(excludeId) {
+  const visibleIds = new Set();
+  document.querySelectorAll('#tableBody tr[data-id]').forEach(tr => {
+    if (tr.dataset.id) visibleIds.add(parseInt(tr.dataset.id, 10));
+  });
+  return rows.filter(r => r.selected && visibleIds.has(r.id) && r.id !== excludeId);
+}
+const BATCH_FILL_FIELDS = ['position','line','paint','nameplate','year','projectNo','process'];
+const BATCH_FILL_LABELS = { position:'位置', line:'条线', paint:'油漆', nameplate:'铭牌', year:'年份', projectNo:'项目号', process:'工序' };
+
+// 事件委托：只在初始化时绑定一次，虚拟滚动重绘不再为每个单元格重复挂监听
 function bindEvents() {
-  document.querySelectorAll('.cell-input').forEach(input => {
-    const _rv = renderVersion;
-    input.addEventListener('change', e => {
-      if (_rv !== renderVersion) return;
-      const id = parseInt(e.target.dataset.id);
-      const field = e.target.dataset.field;
-      const row = rows.find(r => r.id === id);
-      if (!row) return;
-      let newVal;
-      if (field === 'qty' || field === 'line' || field === 'year') {
-        newVal = e.target.value ? parseInt(e.target.value) : '';
-      } else {
-        newVal = e.target.value;
-      }
-      // Skip if value unchanged
-      if (row[field] === newVal) return;
-      pushHistory();
-      row[field] = newVal;
+  if (tableEventsBound) return;
+  tableEventsBound = true;
+  const tbody = document.getElementById('tableBody');
+  let shiftHeld = false;
 
-      // Batch fill: position, line, paint, nameplate, year, projectNo, process apply to all selected rows
-      if ((field === 'position' || field === 'line' || field === 'paint' || field === 'nameplate' || field === 'year' || field === 'projectNo' || field === 'process') && row.selected) {
-        const selectedRows = rows.filter(r => r.selected && r.id !== id);
-        if (selectedRows.length > 0) {
-          selectedRows.forEach(r => { r[field] = newVal; });
-          selectedRows.forEach(r => {
-            const otherTr = document.querySelector(`tr[data-id="${r.id}"]`);
-            if (otherTr) {
-              const el = otherTr.querySelector(`[data-field="${field}"][data-id="${r.id}"]`);
-              if (el) el.value = newVal || '';
-            }
-          });
-          const labels = { position:'位置', line:'条线', paint:'油漆', nameplate:'铭牌', year:'年份', projectNo:'项目号', process:'工序' };
-          showToast(`已批量填写 ${labels[field]}（${selectedRows.length + 1} 行）`);
-        }
-      }
-    });
-    input.addEventListener('focus', e => {
-      lastFocusedRowId = parseInt(e.target.dataset.id);
-      lastFocusedField = e.target.dataset.field;
-    });
+  tbody.addEventListener('mousedown', e => {
+    if (e.target && e.target.type === 'checkbox' && e.target.dataset && e.target.dataset.id) shiftHeld = e.shiftKey;
   });
 
-  document.querySelectorAll('.cell-select').forEach(sel => {
-    const _rv = renderVersion;
-    sel.addEventListener('change', e => {
-      if (_rv !== renderVersion) return;
-      const id = parseInt(e.target.dataset.id);
-      const field = e.target.dataset.field;
-      const row = rows.find(r => r.id === id);
-      if (!row) return;
-      const newVal = e.target.value;
-      if (row[field] === newVal) return;
-      pushHistory();
-      row[field] = newVal;
+  tbody.addEventListener('change', e => {
+    const el = e.target;
+    if (!el || !el.dataset) return;
+    const id = parseInt(el.dataset.id, 10);
 
-      // Batch fill for select fields too (paint, nameplate)
-      if ((field === 'paint' || field === 'nameplate') && row.selected) {
-        const selectedRows = rows.filter(r => r.selected && r.id !== id);
-        if (selectedRows.length > 0) {
-          selectedRows.forEach(r => { r[field] = newVal; });
-          selectedRows.forEach(r => {
-            const otherTr = document.querySelector(`tr[data-id="${r.id}"]`);
-            if (otherTr) {
-              const el = otherTr.querySelector(`[data-field="${field}"][data-id="${r.id}"]`);
-              if (el) el.value = newVal || '';
-            }
-          });
-          const labels = { paint:'油漆', nameplate:'铭牌' };
-          showToast(`已批量填写 ${labels[field]}（${selectedRows.length + 1} 行）`);
-        }
-      }
-    });
-    sel.addEventListener('focus', e => {
-      lastFocusedRowId = parseInt(e.target.dataset.id);
-      lastFocusedField = e.target.dataset.field;
-    });
-  });
-
-  document.querySelectorAll('.model-input-wrap .cell-input').forEach(input => {
-    input.addEventListener('focus', e => {
-      lastFocusedRowId = parseInt(e.target.dataset.id);
-      lastFocusedField = 'model';
-      e.target.select();
-      showAutocomplete(e.target);
-    });
-    input.addEventListener('input', e => {
-      showAutocomplete(e.target);
-    });
-    input.addEventListener('blur', e => {
-      setTimeout(() => hideAutocomplete(), 200);
-    });
-    input.addEventListener('keydown', e => {
-      handleAcKeydown(e);
-    });
-  });
-
-  document.getElementById('checkAll').onchange = e => {
-    rows.forEach(r => r.selected = e.target.checked);
-    if (e.target.checked) lastClickedRowId = null;
-    render();
-  };
-
-  // Click thead to deselect all
-  document.querySelector('thead').addEventListener('click', e => {
-    if (e.target.tagName !== 'INPUT' && rows.some(r => r.selected)) {
-      rows.forEach(r => r.selected = false);
-      document.getElementById('checkAll').checked = false;
-      render();
-    }
-  });
-
-  // Checkbox toggle (use mousedown+change for reliable behavior)
-  let _shiftHeld = false;
-  document.querySelectorAll('tbody tr input[type="checkbox"]').forEach(cb => {
-    cb.addEventListener('mousedown', e => {
-      _shiftHeld = e.shiftKey;
-    });
-    cb.addEventListener('change', e => {
-      const id = parseInt(e.target.dataset.id);
-      const checked = e.target.checked;
-
-      if (_shiftHeld && lastClickedRowId != null && lastClickedRowId !== id) {
-        // Shift+click range select
+    // 行复选框：Shift 连续多选 / 普通勾选
+    if (el.type === 'checkbox') {
+      if (isNaN(id)) return;
+      const checked = el.checked;
+      if (shiftHeld && lastClickedRowId != null && lastClickedRowId !== id) {
         const lastIdx = rows.findIndex(r => r.id === lastClickedRowId);
         const curIdx = rows.findIndex(r => r.id === id);
         if (lastIdx >= 0 && curIdx >= 0) {
@@ -3277,27 +3346,104 @@ function bindEvents() {
         }
       }
       updateInfo();
-    });
+      return;
+    }
+
+    const field = el.dataset.field;
+    if (!field) return;
+    const row = rows.find(r => r.id === id);
+    if (!row) return;
+    let newVal = el.value;
+    if (field === 'qty' || field === 'line' || field === 'year') newVal = newVal ? parseInt(newVal, 10) : '';
+    if (row[field] === newVal) return;
+    pushHistory();
+    row[field] = newVal;
+
+    // 多选批量填写：只改当前显示的选中行，不碰被筛选/虚拟滚动隐藏的行
+    if (BATCH_FILL_FIELDS.indexOf(field) >= 0 && row.selected) {
+      const selectedRows = getVisibleSelectedRows(id);
+      if (selectedRows.length > 0) {
+        selectedRows.forEach(r => { r[field] = newVal; });
+        selectedRows.forEach(r => {
+          const otherTr = tbody.querySelector(`tr[data-id="${r.id}"]`);
+          if (!otherTr) return;
+          const other = otherTr.querySelector(`[data-field="${field}"][data-id="${r.id}"]`);
+          if (other) other.value = newVal || '';
+        });
+        showToast(`已批量填写 ${BATCH_FILL_LABELS[field]}（当前显示 ${selectedRows.length + 1} 行）`);
+      }
+    }
   });
 
-  // Right-click context menu on table rows
-  document.querySelectorAll('tbody tr').forEach(tr => {
-    tr.addEventListener('contextmenu', e => {
-      e.preventDefault();
-      showCtxMenu(e, parseInt(tr.dataset.id));
-    });
+  tbody.addEventListener('focusin', e => {
+    const el = e.target;
+    if (!el || !el.dataset || !el.dataset.field) return;
+    lastFocusedRowId = parseInt(el.dataset.id, 10);
+    lastFocusedField = el.dataset.field;
+    if (el.classList.contains('cell-input') && el.closest('.model-input-wrap')) {
+      el.select();
+      showAutocomplete(el);
+    }
   });
 
-  // Drag & Drop: drag handle initiates drag, row handles drop target
-  document.querySelectorAll('.drag-handle').forEach(handle => {
-    handle.addEventListener('dragstart', handleDragStart);
-    handle.addEventListener('dragend', handleDragEnd);
+  tbody.addEventListener('input', e => {
+    const el = e.target;
+    if (el && el.classList && el.classList.contains('cell-input') && el.closest('.model-input-wrap')) showAutocomplete(el);
   });
-  document.querySelectorAll('tbody tr').forEach(tr => {
-    tr.addEventListener('dragover', handleDragOver);
-    tr.addEventListener('dragleave', handleDragLeave);
-    tr.addEventListener('drop', handleDrop);
+
+  tbody.addEventListener('focusout', e => {
+    const el = e.target;
+    if (el && el.classList && el.classList.contains('cell-input') && el.closest('.model-input-wrap')) {
+      setTimeout(() => hideAutocomplete(), 200);
+    }
   });
+
+  tbody.addEventListener('keydown', e => {
+    const el = e.target;
+    if (el && el.classList && el.classList.contains('cell-input') && el.closest('.model-input-wrap')) handleAcKeydown(e);
+  });
+
+  const checkAll = document.getElementById('checkAll');
+  if (checkAll) checkAll.addEventListener('change', e => {
+    rows.forEach(r => r.selected = e.target.checked);
+    if (e.target.checked) lastClickedRowId = null;
+    render();
+  });
+
+  // 表头：列筛选按钮 / 点击空白处取消全选（只绑定一次）
+  const thead = document.querySelector('thead');
+  if (thead) thead.addEventListener('click', e => {
+    const fb = e.target.closest ? e.target.closest('.th-filter-btn') : null;
+    if (fb) {
+      e.stopPropagation();
+      if (document.getElementById('colFilterPanel').style.display === 'block' && fb.dataset.field === cfField) closeColumnFilter();
+      else openColumnFilter(fb.dataset.field, fb);
+      return;
+    }
+    if (e.target.tagName !== 'INPUT' && rows.some(r => r.selected)) {
+      rows.forEach(r => r.selected = false);
+      document.getElementById('checkAll').checked = false;
+      render();
+    }
+  });
+
+  tbody.addEventListener('contextmenu', e => {
+    const tr = e.target.closest ? e.target.closest('tr[data-id]') : null;
+    if (!tr) return;
+    e.preventDefault();
+    showCtxMenu(e, parseInt(tr.dataset.id, 10));
+  });
+
+  // 拖拽：所有行事件走委托，重绘后无需重新绑定
+  tbody.addEventListener('dragstart', e => {
+    if (e.target && e.target.classList && e.target.classList.contains('drag-handle')) handleDragStart(e);
+  });
+  tbody.addEventListener('dragend', e => {
+    if (e.target && e.target.classList && e.target.classList.contains('drag-handle')) handleDragEnd(e);
+  });
+  tbody.addEventListener('dragover', handleDragOver);
+  tbody.addEventListener('dragleave', handleDragLeave);
+  tbody.addEventListener('drop', handleDrop);
 }
 
 // ========== Drag & Drop ==========
@@ -3307,7 +3453,8 @@ let dropTargetIdx = -1;   // Target index for drop
 let dropPosition = null;  // 'top' or 'bottom'
 
 function handleDragStart(e) {
-  const tr = e.currentTarget.closest('tr');
+  const tr = (e.target && e.target.closest ? e.target.closest('tr[data-id]') : null)
+          || (e.currentTarget.closest ? e.currentTarget.closest('tr[data-id]') : null);
   if (!tr) return;
   const rowId = parseInt(tr.dataset.id);
   const row = rows.find(r => r.id === rowId);
@@ -3351,7 +3498,8 @@ function handleDragEnd(e) {
 
 function handleDragOver(e) {
   e.preventDefault();
-  const tr = e.currentTarget;
+  const tr = (e.target && e.target.closest ? e.target.closest('tr[data-id]') : null) || e.currentTarget;
+  if (!tr || !tr.dataset || !tr.dataset.id) return;
   const targetId = parseInt(tr.dataset.id);
 
   // Don't show drop indicator on a row that's being dragged
@@ -3380,12 +3528,14 @@ function handleDragOver(e) {
 }
 
 function handleDragLeave(e) {
-  e.currentTarget.classList.remove('drag-over-top', 'drag-over-bottom');
+  const tr = (e.target && e.target.closest ? e.target.closest('tr[data-id]') : null) || e.currentTarget;
+  if (tr) tr.classList.remove('drag-over-top', 'drag-over-bottom');
 }
 
 function handleDrop(e) {
   e.preventDefault();
-  const tr = e.currentTarget;
+  const tr = (e.target && e.target.closest ? e.target.closest('tr[data-id]') : null) || e.currentTarget;
+  if (!tr || !tr.dataset || !tr.dataset.id) return;
   tr.classList.remove('drag-over-top', 'drag-over-bottom');
 
   if (dragRowIds.length === 0 || dropTargetIdx < 0) return;
@@ -3669,6 +3819,7 @@ document.addEventListener('keydown', e => {
   // Escape 逐层关闭：确认框 → 通用弹窗 → 存档/云同步面板
   if (e.key === 'Escape') {
     hideCtxMenu(); hideAutocomplete();
+    if (document.getElementById('colFilterPanel').style.display === 'block') { closeColumnFilter(); return; }
     const mo = document.getElementById('modalOverlay');
     const mi = document.getElementById('miniOverlay');
     if (mo && mo.classList.contains('show')) {
@@ -4326,6 +4477,8 @@ function clearContracts() {
 
 // ========== Init ==========
 (function init() {
+  initColumnFilterButtons();
+
   function initAfterCheck() {
     // Try to load reference data from cache
     loadRefFromCache();
@@ -4379,6 +4532,7 @@ function clearContracts() {
   // Row density selector
   document.getElementById('rowDensity').addEventListener('change', e => {
     setDensity(e.target.value);
+    render();   // 行高变化后重算虚拟占位，避免出现空白或错位
   });
 
   // Filter input
@@ -4392,12 +4546,15 @@ function clearContracts() {
     if (filterText) render();
   });
 
-  // Virtual scroll: re-render on scroll
+  // Virtual scroll: 只在可见行窗口变化时重绘，passive 监听避免阻塞滚动
   let vsTimer = null;
   document.querySelector('.table-wrapper').addEventListener('scroll', () => {
-    if (vsTimer) cancelAnimationFrame(vsTimer);
-    vsTimer = requestAnimationFrame(() => render());
-  });
+    if (vsTimer) return;
+    vsTimer = requestAnimationFrame(() => {
+      vsTimer = null;
+      render({ scrollOnly: true });
+    });
+  }, { passive: true });
 
   // 存档系统 / 云同步初始化（事件委托、配置回填、配额显示、自动同步状态）
   initArchiveSystem();
@@ -4405,16 +4562,18 @@ function clearContracts() {
 
 // Global clear filter (called from button)
 function clearFilter() {
-  filterText = '';
+  filterText = ''; columnFilters = {};
   document.getElementById('filterInput').value = '';
+  updateHeaderFilterMarks();
   render();
 }
 
-// Close autocomplete on click outside
+// Close autocomplete / column filter on click outside
 document.addEventListener('click', e => {
   if (!e.target.closest('.model-input-wrap') && !e.target.closest('.autocomplete')) {
     hideAutocomplete();
   }
+  if (!e.target.closest('#colFilterPanel') && !e.target.closest('.th-filter-btn')) closeColumnFilter();
 });
 </script>
 </body>
