@@ -41,10 +41,11 @@ body {
 .header {
   background: var(--card);
   border-bottom: 1px solid var(--border);
-  padding: 16px 24px;
+  padding: 10px 24px;
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: space-between;
+  gap: 20px;
   position: sticky;
   top: 0;
   z-index: 100;
@@ -55,13 +56,34 @@ body {
   font-size: 20px;
   font-weight: 700;
   color: var(--text);
+  white-space: nowrap;
+  padding-top: 10px;
 }
 
-.header-actions {
+.toolbar {
   display: flex;
-  gap: 4px;
+  flex-direction: column;
+  gap: 6px;
+}
+.toolbar-row {
+  display: flex;
   align-items: center;
+  gap: 10px;
   flex-wrap: wrap;
+}
+.tool-group {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding-right: 10px;
+  border-right: 1px solid var(--border);
+}
+.tool-group:last-child { border-right: none; padding-right: 0; }
+.tool-label {
+  font-size: 10px;
+  color: var(--text-muted);
+  white-space: nowrap;
+  margin-right: 2px;
 }
 
 .header-sep {
@@ -177,7 +199,7 @@ body {
   border-radius: 8px;
   border: 1px solid var(--border);
   overflow: auto;
-  max-height: calc(100vh - 195px);
+  max-height: calc(100vh - 235px);
   position: relative;
 }
 .vs-spacer { visibility: hidden; pointer-events: none; }
@@ -756,62 +778,75 @@ table.hide-nonessential .col-nameplate {
 
 <div class="header">
   <h1>设备清单制作工具</h1>
-  <div class="header-actions">
-    <!-- Edit -->
-    <button class="btn btn-outline" id="undoBtn" onclick="undo()" disabled title="撤销 Ctrl+Z">↩</button>
-    <button class="btn btn-outline" id="redoBtn" onclick="redo()" disabled title="重做 Ctrl+Y">↪</button>
-    <div class="header-sep"></div>
-    <!-- View -->
-    <select id="rowDensity" class="btn btn-outline" style="font-size:11px;padding:4px 6px;cursor:pointer" title="行间距">
-      <option value="compact">紧凑</option>
-      <option value="default" selected>默认</option>
-      <option value="loose">宽松</option>
-    </select>
-    <button class="btn btn-outline" id="toggleNonEssential" onclick="toggleNonEssential()" title="隐藏/显示非关键列">精简</button>
-    <div class="smark-wrap">
-      <button class="btn btn-outline" id="smarkBtn" title="一键填充特殊标记">标记</button>
-      <div class="smark-panel" id="smarkPanel"></div>
-    </div>
-    <div class="header-sep"></div>
-    <!-- Data import -->
-    <label class="btn btn-outline" title="加载/刷新成品型号对照表（xlsx）">
-      📋 对照表
-      <input type="file" id="refFileInput" accept=".xlsx,.xls" style="display:none">
-    </label>
-    <div class="cmenu-wrap" id="cmenuWrap">
-      <button class="btn btn-outline" id="cmenuBtn" title="合同号：填充 / 模拟 / 清除">📄 合同号 ▾</button>
-      <div class="cmenu-panel" id="cmenuPanel">
-        <div class="cmenu-item" onclick="hideCMenu();triggerContractFile()">📄 填合同号（RICH定单表）</div>
-        <div class="cmenu-item" onclick="hideCMenu();simulateContracts()">⚡ 模拟合同号（仅补空）</div>
-        <div class="cmenu-sep"></div>
-        <div class="cmenu-item danger" onclick="hideCMenu();clearContracts()">🗑 清除合同号</div>
+  <div class="toolbar">
+    <div class="toolbar-row">
+      <div class="tool-group">
+        <span class="tool-label">编辑</span>
+        <button class="btn btn-outline" id="undoBtn" onclick="undo()" disabled title="撤销 Ctrl+Z">↩</button>
+        <button class="btn btn-outline" id="redoBtn" onclick="redo()" disabled title="重做 Ctrl+Y">↪</button>
       </div>
-      <input type="file" id="contractFile" accept=".xlsx,.xls,.csv" style="display:none">
-    </div>
-    <button class="btn btn-outline" onclick="autoNumberMatch()" title="仅对责任部门为 ME 的行生效：按主设备=1分组，自动给每组的配套标识编序号（其它部门原值不动；独立设备主设备=0不参与）">🔢 自动编号</button>
-    <label class="btn btn-outline" title="导入已有设备清单">
-      📥 导入
-      <input type="file" id="importFile" accept=".xlsx,.xls" style="display:none">
-    </label>
-    <div class="header-sep"></div>
-    <!-- Row ops -->
-    <button class="btn btn-primary" onclick="addRow()">+ 添加行</button>
-    <button class="btn btn-danger" onclick="deleteSelected()">删除选中</button>
-    <div class="header-sep"></div>
-    <!-- File output -->
-    <span id="autosaveTime" style="color:#94a3b8;font-size:10px;flex-shrink:0"></span>
-    <button class="btn btn-warning" onclick="showArchivePanel()" title="项目存档管理">📁 存档</button>
-    <button class="btn btn-outline" onclick="showCloudPanel()" title="GitHub 云端同步（与任务管理器共用仓库）">☁ 云同步</button>
-    <span id="elGhAutoStatus" class="gh-auto-status" title=""></span>
-    <div class="cmenu-wrap" id="dataBakWrap">
-      <button class="btn btn-outline" id="dataBakBtn" title="整机数据备份 / 恢复（工作区+存档+对照表+工时）">🗄 数据 ▾</button>
-      <div class="cmenu-panel" id="dataBakPanel">
-        <div class="cmenu-item" onclick="hideDataBak();exportFullData()">📤 导出数据 (JSON)</div>
-        <div class="cmenu-item" onclick="hideDataBak();document.getElementById('fullDataImportFile').click()">📥 导入数据 (JSON)</div>
-        <input type="file" id="fullDataImportFile" accept=".json" style="display:none" onchange="importFullData(event)">
+      <div class="tool-group">
+        <span class="tool-label">视图</span>
+        <select id="rowDensity" class="btn btn-outline" style="font-size:11px;padding:4px 6px;cursor:pointer" title="行间距">
+          <option value="compact">紧凑</option>
+          <option value="default" selected>默认</option>
+          <option value="loose">宽松</option>
+        </select>
+        <button class="btn btn-outline" id="toggleNonEssential" onclick="toggleNonEssential()" title="隐藏/显示非关键列">精简</button>
+        <div class="smark-wrap">
+          <button class="btn btn-outline" id="smarkBtn" title="一键填充特殊标记">标记</button>
+          <div class="smark-panel" id="smarkPanel"></div>
+        </div>
+      </div>
+      <div class="tool-group">
+        <span class="tool-label">行操作</span>
+        <button class="btn btn-outline" onclick="autoNumberMatch()" title="仅对责任部门为 ME 的行生效：按主设备=1分组，自动给每组的配套标识编序号（其它部门原值不动；独立设备主设备=0不参与）">🔢 自动编号</button>
+        <button class="btn btn-primary" onclick="addRow()">+ 添加行</button>
+        <button class="btn btn-danger" onclick="deleteSelected()">删除选中</button>
       </div>
     </div>
-    <button class="btn btn-outline" onclick="exportExcel()">📤 导出</button>
+    <div class="toolbar-row">
+      <div class="tool-group">
+        <span class="tool-label">数据</span>
+        <label class="btn btn-outline" title="加载/刷新成品型号对照表（xlsx）">
+          📋 对照表
+          <input type="file" id="refFileInput" accept=".xlsx,.xls" style="display:none">
+        </label>
+        <div class="cmenu-wrap" id="cmenuWrap">
+          <button class="btn btn-outline" id="cmenuBtn" title="合同号：填充 / 模拟 / 清除">📄 合同号 ▾</button>
+          <div class="cmenu-panel" id="cmenuPanel">
+            <div class="cmenu-item" onclick="hideCMenu();triggerContractFile()">📄 填合同号（RICH定单表）</div>
+            <div class="cmenu-item" onclick="hideCMenu();simulateContracts()">⚡ 模拟合同号（仅补空）</div>
+            <div class="cmenu-sep"></div>
+            <div class="cmenu-item danger" onclick="hideCMenu();clearContracts()">🗑 清除合同号</div>
+          </div>
+          <input type="file" id="contractFile" accept=".xlsx,.xls,.csv" style="display:none">
+        </div>
+        <label class="btn btn-outline" title="导入已有设备清单">
+          📥 导入
+          <input type="file" id="importFile" accept=".xlsx,.xls" style="display:none">
+        </label>
+      </div>
+      <div class="tool-group">
+        <span class="tool-label">存档同步</span>
+        <span id="autosaveTime" style="color:#94a3b8;font-size:10px;flex-shrink:0"></span>
+        <button class="btn btn-warning" onclick="showArchivePanel()" title="项目存档管理">📁 存档</button>
+        <button class="btn btn-outline" onclick="showCloudPanel()" title="GitHub 云端同步（与任务管理器共用仓库）">☁ 云同步</button>
+        <span id="elGhAutoStatus" class="gh-auto-status" title=""></span>
+      </div>
+      <div class="tool-group">
+        <span class="tool-label">备份导出</span>
+        <div class="cmenu-wrap" id="dataBakWrap">
+          <button class="btn btn-outline" id="dataBakBtn" title="整机数据备份 / 恢复（工作区+存档+对照表+工时）">🗄 数据 ▾</button>
+          <div class="cmenu-panel" id="dataBakPanel">
+            <div class="cmenu-item" onclick="hideDataBak();exportFullData()">📤 导出数据 (JSON)</div>
+            <div class="cmenu-item" onclick="hideDataBak();document.getElementById('fullDataImportFile').click()">📥 导入数据 (JSON)</div>
+            <input type="file" id="fullDataImportFile" accept=".json" style="display:none" onchange="importFullData(event)">
+          </div>
+        </div>
+        <button class="btn btn-outline" onclick="exportExcel()">📤 导出</button>
+      </div>
+    </div>
   </div>
 </div>
 
@@ -839,36 +874,6 @@ table.hide-nonessential .col-nameplate {
     <h3>请加载成品型号对照表</h3>
     <p>点击顶部「对照表」按钮，选择「成品型号对照表.xlsx」文件，即可启用型号智能搜索和自动填充功能。</p>
   </div>
-</div>
-
-<div class="filter-bar">
-  <span style="font-size:13px;color:#64748b">🔍</span>
-  <select id="filterField" class="filter-field" title="选择筛选字段">
-    <option value="">全部字段</option>
-    <option value="equipName">设备名称</option>
-    <option value="model">型号</option>
-    <option value="subModel">补充型号</option>
-    <option value="attr">属性</option>
-    <option value="blockOwner">撬块归属</option>
-    <option value="process">工序</option>
-    <option value="designNote">设计备注</option>
-    <option value="position">位置</option>
-    <option value="contractAttr">合同属性</option>
-    <option value="biz">业务归属</option>
-    <option value="dept">责任部门</option>
-    <option value="paint">油漆</option>
-    <option value="nameplate">铭牌</option>
-    <option value="specialMark">特殊标记</option>
-    <option value="projectNo">项目号</option>
-    <option value="virtualCode">虚拟码</option>
-    <option value="contractNo">合同号</option>
-    <option value="year">年份</option>
-    <option value="qty">数量</option>
-    <option value="line">条线</option>
-  </select>
-  <input type="text" id="filterInput" placeholder="输入关键词筛选…" autocomplete="off" data-lpignore="true" data-1p-ignore data-bwignore spellcheck="false" name="el_filter">
-  <span class="filter-count" id="filterCount"></span>
-  <button class="filter-clear" id="filterClear" style="display:none" onclick="clearFilter()">清除</button>
 </div>
 
 <div class="table-wrapper">
@@ -1515,7 +1520,6 @@ function loadArchive(id){
     updateTimerDisplay(); saveTimerState();
     redoStack = [];
     filterText = ''; columnFilters = {};
-    const fi = document.getElementById('filterInput'); if (fi) fi.value = '';
     const tw = document.querySelector('.table-wrapper'); if (tw) tw.scrollTop = 0;
     currentArchiveId = arch.id;
     render(); autoSave(); renderArchiveList(); closeArchivePanel();
@@ -1650,8 +1654,7 @@ function doImportFullData(obj, mode){
       }
       undoStack = []; redoStack = []; updateUndoUI();
       filterText = ''; columnFilters = {};
-      const fi = document.getElementById('filterInput'); if (fi) fi.value = '';
-      render(); autoSave(); renderArchiveList();
+        render(); autoSave(); renderArchiveList();
       showToast('数据已覆盖导入：' + rows.length + ' 行 / ' + getArchives().length + ' 个存档');
     } else {
       // 合并：按 id 去重追加
@@ -2117,7 +2120,6 @@ function applyCloudData(obj){
     }
     redoStack = [];
     filterText = ''; columnFilters = {};
-    const fi = document.getElementById('filterInput'); if (fi) fi.value = '';
     const tw = document.querySelector('.table-wrapper'); if (tw) tw.scrollTop = 0;
     render(); autoSave(); renderArchiveList();
   } finally { _ghSuppressAuto = false; }
@@ -2919,17 +2921,99 @@ function handleCellArrow(e){
   return true;
 }
 
-// 从实际渲染结果测量行高：切换行密度后，虚拟占位的高度必须跟着变，否则会错位/留白
+// ========== 虚拟滚动：行元素复用池 ==========
+// 滚动时只把池里的 <tr> 换个数据，不销毁重建 DOM，避免闪白
+let vsTopSpacer = null;
+let vsBottomSpacer = null;
+let vsPool = [];
+const VS_POOL_MIN = 30;
+
 function syncRowHeight() {
-  const probe = document.querySelector('#tableBody tr[data-id]');
+  const probe = vsPool.find(tr => tr.style.display !== 'none');
   if (!probe) return;
   const h = probe.getBoundingClientRect().height;
   if (h > 0) ROW_HEIGHT = h;
 }
 
-// 防自动填充标记直接写进 HTML，避免每次重绘后再遍历上千个节点逐个设置属性
+// 防自动填充标记直接写进模板，复用时只需更新 name / data-id
 function cellAttrs(field, id) {
   return `autocomplete="off" data-lpignore="true" data-1p-ignore="" data-bwignore="" data-form-type="other" spellcheck="false" name="el_${field}_${id}"`;
+}
+function setSpacerHeight(spacer, px) {
+  spacer.style.height = px + 'px';
+  const td = spacer.firstElementChild;
+  if (td) td.style.height = px + 'px';
+}
+function ensureVirtualSkeleton() {
+  const tbody = document.getElementById('tableBody');
+  if (vsTopSpacer) return;
+  vsTopSpacer = document.createElement('tr');
+  vsTopSpacer.className = 'vs-spacer';
+  vsTopSpacer.innerHTML = '<td colspan="28"></td>';
+  vsBottomSpacer = document.createElement('tr');
+  vsBottomSpacer.className = 'vs-spacer';
+  vsBottomSpacer.innerHTML = '<td colspan="28"></td>';
+  tbody.appendChild(vsTopSpacer);
+  tbody.appendChild(vsBottomSpacer);
+}
+function createPoolRow() {
+  const tr = document.createElement('tr');
+  tr.innerHTML = `
+    <td class="check-cell"><input type="checkbox"></td>
+    <td class="col-drag"><div class="drag-handle" draggable="true" title="拖拽移动（Ctrl+拖拽=复制）">⠿</div></td>
+    <td class="col-seq"><div class="row-num"></div></td>
+    <td class="col-year"><input class="cell-input number" type="number" data-field="year" ${cellAttrs('year', 0)}></td>
+    <td class="col-project"><input class="cell-input" data-field="projectNo" placeholder="项目号" ${cellAttrs('projectNo', 0)}></td>
+    <td class="col-vcode"><input class="cell-input" data-field="virtualCode" placeholder="虚拟码" ${cellAttrs('virtualCode', 0)}></td>
+    <td class="col-contract"><input class="cell-input" data-field="contractNo" placeholder="合同号" ${cellAttrs('contractNo', 0)}></td>
+    <td class="col-name"><input class="cell-input" data-field="equipName" placeholder="自动填充" ${cellAttrs('equipName', 0)}></td>
+    <td class="col-model"><div class="model-input-wrap"><input class="cell-input" data-field="model" placeholder="输入型号或名称搜索..." ${cellAttrs('model', 0)}></div></td>
+    <td class="col-submodel"><input class="cell-input" data-field="subModel" placeholder="补充型号" ${cellAttrs('subModel', 0)}></td>
+    <td class="col-attr">${selectHtml('attr', 0, '', ATTRS)}</td>
+    <td class="col-block"><input class="cell-input" data-field="blockOwner" placeholder="撬块归属" ${cellAttrs('blockOwner', 0)}></td>
+    <td class="col-process"><input class="cell-input" data-field="process" placeholder="工序" ${cellAttrs('process', 0)}></td>
+    <td class="col-note"><input class="cell-input" data-field="designNote" placeholder="设计备注" ${cellAttrs('designNote', 0)}></td>
+    <td class="col-qty"><input class="cell-input number" type="number" min="1" data-field="qty" ${cellAttrs('qty', 0)}></td>
+    <td class="col-purchase">${selectHtml('purchase', 0, '', PURCHASES)}</td>
+    <td class="col-pos"><input class="cell-input" data-field="position" placeholder="位置" ${cellAttrs('position', 0)}></td>
+    <td class="col-contract-attr">${selectHtml('contractAttr', 0, '', CONTRACT_ATTRS)}</td>
+    <td class="col-biz">${selectHtml('biz', 0, '', BIZS)}</td>
+    <td class="col-dept">${selectHtml('dept', 0, '', DEPTS)}</td>
+    <td class="col-paint">${selectHtml('paint', 0, '', PAINTS)}</td>
+    <td class="col-nameplate">${selectHtml('nameplate', 0, '', NAMEPLATES)}</td>
+    <td class="col-line"><input class="cell-input number" type="number" min="1" data-field="line" placeholder="条线" ${cellAttrs('line', 0)}></td>
+    <td class="col-mainEquip"><input class="cell-input" data-field="mainEquip" placeholder="主设备" ${cellAttrs('mainEquip', 0)}></td>
+    <td class="col-matchMark"><input class="cell-input" data-field="matchMark" placeholder="配套标识" ${cellAttrs('matchMark', 0)}></td>
+    <td class="col-special"><input class="cell-input" data-field="specialMark" placeholder="特殊标记" ${cellAttrs('specialMark', 0)}></td>
+    <td class="col-del"><button class="btn btn-danger" style="padding:4px 8px;font-size:11px" title="删除此行">&times;</button></td>`;
+  tr._check = tr.querySelector('.check-cell input');
+  tr._num = tr.querySelector('.row-num');
+  tr._del = tr.querySelector('.btn-danger');
+  tr._fields = Array.from(tr.querySelectorAll('[data-field]'));
+  return tr;
+}
+function updatePoolRow(tr, r, i, currentYear) {
+  tr.dataset.id = String(r.id);
+  tr.dataset.idx = String(i);
+  const gi = r.line ? parseInt(r.line) : -1;
+  const groupClass = gi >= 0 ? ` line-group-${((gi - 1) % 6 + 6) % 6}` : '';
+  tr.className = (r.selected ? 'selected ' : '') + groupClass;
+  tr._check.checked = !!r.selected;
+  tr._check.dataset.id = String(r.id);
+  tr._check.name = 'el_check_' + r.id;
+  tr._num.textContent = i + 1;
+  tr._del.setAttribute('onclick', 'deleteRow(' + r.id + ')');
+  tr._fields.forEach(el => {
+    const field = el.dataset.field;
+    el.dataset.id = String(r.id);
+    el.name = 'el_' + field + '_' + r.id;
+    let v = r[field];
+    if (field === 'year') v = r.year || currentYear;
+    else if (field === 'qty') v = r.qty || 1;
+    else if (field === 'line') v = r.line || '';
+    v = v == null ? '' : String(v);
+    if (el.value !== v) el.value = v;
+  });
 }
 
 function render(opts) {
@@ -2943,7 +3027,6 @@ function render(opts) {
   let displayRows = getFilteredRows();
   const q = filterText.toLowerCase();
   const f = document.getElementById('filterField') ? document.getElementById('filterField').value : '';
-
   const total = displayRows.length;
   const viewH = wrapper ? wrapper.clientHeight : window.innerHeight;
   const scrollTop = wrapper ? wrapper.scrollTop : 0;
@@ -2955,58 +3038,37 @@ function render(opts) {
     endIdx = Math.min(total, startIdx + MIN_VISIBLE);
   }
 
-  // 滚动时只有可见窗口真正变化才重建 DOM；微小滚动直接跳过，scroll 不再卡顿
   const density = getComputedStyle(document.documentElement).getPropertyValue('--row-min-height');
   const winKey = `${q}|${f}|${density}|${total}|${startIdx}|${endIdx}`;
-  if (scrollOnly && vsWindow.key === winKey) return;
+  if (scrollOnly && vsWindow.key === winKey) return;   // 同一窗口不碰 DOM
   vsWindow.key = winKey;
 
-  let html = `<tr class="vs-spacer" style="height:${startIdx * ROW_HEIGHT}px"><td colspan="28"></td></tr>`;
-
-  for (let i = startIdx; i < endIdx && i < total; i++) {
-    const r = displayRows[i];
-    const gi = r.line ? parseInt(r.line) : -1;
-    const groupClass = gi >= 0 ? ` line-group-${((gi - 1) % 6 + 6) % 6}` : '';
-    html += `<tr data-id="${r.id}" data-idx="${i}" class="${r.selected ? 'selected' : ''}${groupClass}">`;
-    html += `<td class="check-cell"><input type="checkbox" ${r.selected ? 'checked' : ''} data-id="${r.id}" ${cellAttrs('check', r.id)}></td>`;
-    html += `<td class="col-drag"><div class="drag-handle" draggable="true" title="拖拽移动（Ctrl+拖拽=复制）">⠿</div></td>`;
-    html += `<td class="col-seq"><div class="row-num">${i + 1}</div></td>`;
-    html += `<td class="col-year"><input class="cell-input number" type="number" value="${r.year || currentYear}" data-field="year" data-id="${r.id}" ${cellAttrs('year', r.id)}></td>`;
-    html += `<td class="col-project"><input class="cell-input" value="${esc(r.projectNo)}" data-field="projectNo" data-id="${r.id}" placeholder="项目号" ${cellAttrs('projectNo', r.id)}></td>`;
-    html += `<td class="col-vcode"><input class="cell-input" value="${esc(r.virtualCode)}" data-field="virtualCode" data-id="${r.id}" placeholder="虚拟码" ${cellAttrs('virtualCode', r.id)}></td>`;
-    html += `<td class="col-contract"><input class="cell-input" value="${esc(r.contractNo)}" data-field="contractNo" data-id="${r.id}" placeholder="合同号" ${cellAttrs('contractNo', r.id)}></td>`;
-    html += `<td class="col-name"><input class="cell-input" value="${esc(r.equipName)}" data-field="equipName" data-id="${r.id}" placeholder="自动填充" ${cellAttrs('equipName', r.id)}></td>`;
-    html += `<td class="col-model"><div class="model-input-wrap"><input class="cell-input" value="${esc(r.model)}" data-field="model" data-id="${r.id}" placeholder="输入型号或名称搜索..." ${cellAttrs('model', r.id)}></div></td>`;
-    html += `<td class="col-submodel"><input class="cell-input" value="${esc(r.subModel)}" data-field="subModel" data-id="${r.id}" placeholder="补充型号" ${cellAttrs('subModel', r.id)}></td>`;
-    html += `<td class="col-attr">${selectHtml('attr', r.id, r.attr, ATTRS)}</td>`;
-    html += `<td class="col-block"><input class="cell-input" value="${esc(r.blockOwner)}" data-field="blockOwner" data-id="${r.id}" placeholder="撬块归属" ${cellAttrs('blockOwner', r.id)}></td>`;
-    html += `<td class="col-process"><input class="cell-input" value="${esc(r.process)}" data-field="process" data-id="${r.id}" placeholder="工序" ${cellAttrs('process', r.id)}></td>`;
-    html += `<td class="col-note"><input class="cell-input" value="${esc(r.designNote)}" data-field="designNote" data-id="${r.id}" placeholder="设计备注" ${cellAttrs('designNote', r.id)}></td>`;
-    html += `<td class="col-qty"><input class="cell-input number" type="number" min="1" value="${r.qty || 1}" data-field="qty" data-id="${r.id}" ${cellAttrs('qty', r.id)}></td>`;
-    html += `<td class="col-purchase">${selectHtml('purchase', r.id, r.purchase, PURCHASES)}</td>`;
-    html += `<td class="col-pos"><input class="cell-input" value="${esc(r.position)}" data-field="position" data-id="${r.id}" placeholder="位置" ${cellAttrs('position', r.id)}></td>`;
-    html += `<td class="col-contract-attr">${selectHtml('contractAttr', r.id, r.contractAttr, CONTRACT_ATTRS)}</td>`;
-    html += `<td class="col-biz">${selectHtml('biz', r.id, r.biz, BIZS)}</td>`;
-    html += `<td class="col-dept">${selectHtml('dept', r.id, r.dept, DEPTS)}</td>`;
-    html += `<td class="col-paint">${selectHtml('paint', r.id, r.paint, PAINTS)}</td>`;
-    html += `<td class="col-nameplate">${selectHtml('nameplate', r.id, r.nameplate, NAMEPLATES)}</td>`;
-    html += `<td class="col-line"><input class="cell-input number" type="number" min="1" value="${r.line || ''}" data-field="line" data-id="${r.id}" placeholder="条线" ${cellAttrs('line', r.id)}></td>`;
-    html += `<td class="col-mainEquip"><input class="cell-input" value="${esc(r.mainEquip)}" data-field="mainEquip" data-id="${r.id}" placeholder="主设备" ${cellAttrs('mainEquip', r.id)}></td>`;
-    html += `<td class="col-matchMark"><input class="cell-input" value="${esc(r.matchMark)}" data-field="matchMark" data-id="${r.id}" placeholder="配套标识" ${cellAttrs('matchMark', r.id)}></td>`;
-    html += `<td class="col-special"><input class="cell-input" value="${esc(r.specialMark)}" data-field="specialMark" data-id="${r.id}" placeholder="特殊标记" ${cellAttrs('specialMark', r.id)}></td>`;
-    html += `<td class="col-del"><button class="btn btn-danger" style="padding:4px 8px;font-size:11px" onclick="deleteRow(${r.id})" title="删除此行">&times;</button></td>`;
-    html += '</tr>';
+  ensureVirtualSkeleton();
+  const need = Math.max(0, endIdx - startIdx);
+  const targetPool = Math.max(need, VS_POOL_MIN);
+  while (vsPool.length < targetPool) {
+    const tr = createPoolRow();
+    vsPool.push(tr);
+    tbody.insertBefore(tr, vsBottomSpacer);
   }
+  for (let k = 0; k < vsPool.length; k++) {
+    const tr = vsPool[k];
+    if (k < need) {
+      updatePoolRow(tr, displayRows[startIdx + k], startIdx + k, currentYear);
+      if (tr.style.display === 'none') tr.style.display = '';
+    } else if (tr.style.display !== 'none') {
+      tr.style.display = 'none';
+      delete tr.dataset.id;
+      if (tr._check) delete tr._check.dataset.id;
+      tr._fields.forEach(el => delete el.dataset.id);
+    }
+  }
+  setSpacerHeight(vsTopSpacer, startIdx * ROW_HEIGHT);
+  setSpacerHeight(vsBottomSpacer, Math.max(0, (total - endIdx) * ROW_HEIGHT));
+  bindEvents();   // 事件委托只绑定一次
 
-  // 占位高度严格等于未渲染行数，不再额外加 4 行空白
-  html += `<tr class="vs-spacer" style="height:${Math.max(0, (total - endIdx) * ROW_HEIGHT)}px"><td colspan="28"></td></tr>`;
-
-  tbody.innerHTML = html;
-  bindEvents();   // 仅在首次绑定；后续重绘靠事件委托，不再重复挂监听
-
-  // 首次渲染后才知道真实行高；若与预估值不一致，校准占位后重排一次
-  const probe = tbody.querySelector('tr[data-id]');
-  if (probe) {
+  const probe = vsPool[0];
+  if (probe && probe.style.display !== 'none') {
     const h = probe.getBoundingClientRect().height;
     if (h > 0 && Math.abs(h - ROW_HEIGHT) > 0.5 && !(opts && opts.heightFixed)) {
       ROW_HEIGHT = h;
@@ -3035,17 +3097,6 @@ function esc(str) {
 function updateInfo() {
   document.getElementById('totalRows').textContent = rows.length;
   document.getElementById('selectedCount').textContent = rows.filter(r => r.selected).length;
-  const fc = document.getElementById('filterCount');
-  const fcb = document.getElementById('filterClear');
-  const hasFilter = !!filterText || Object.keys(columnFilters).length > 0;
-  if (hasFilter) {
-    const visible = getFilteredRows().length;
-    fc.textContent = `匹配 ${visible} / ${rows.length}`;
-    fcb.style.display = '';
-  } else {
-    fc.textContent = '';
-    fcb.style.display = 'none';
-  }
 }
 
 // Filter match helper: field-level or all-fields
@@ -4602,17 +4653,6 @@ function clearContracts() {
     render();   // 行高变化后重算虚拟占位，避免出现空白或错位
   });
 
-  // Filter input
-  const filterInput = document.getElementById('filterInput');
-  filterInput.addEventListener('input', e => {
-    filterText = e.target.value.trim();
-    render();
-  });
-  // Filter field change: re-apply if text is present
-  document.getElementById('filterField').addEventListener('change', () => {
-    if (filterText) render();
-  });
-
   // Virtual scroll: 只在可见行窗口变化时重绘，passive 监听避免阻塞滚动
   let vsTimer = null;
   document.querySelector('.table-wrapper').addEventListener('scroll', () => {
@@ -4628,10 +4668,9 @@ function clearContracts() {
   initArchiveSystem();
 })();
 
-// Global clear filter (called from button)
+// 清除全部列筛选
 function clearFilter() {
   filterText = ''; columnFilters = {};
-  document.getElementById('filterInput').value = '';
   updateHeaderFilterMarks();
   render();
 }
