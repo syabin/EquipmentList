@@ -3385,7 +3385,8 @@ function trDeselected(id) {
   if (tr) { tr.classList.remove('selected'); const cb = tr.querySelector('input[type="checkbox"]'); if (cb) cb.checked = false; }
 }
 function updateCheckAll() {
-  document.getElementById('checkAll').checked = rows.length > 0 && rows.every(r => r.selected);
+  const visible = getFilteredRows();
+  document.getElementById('checkAll').checked = visible.length > 0 && visible.every(r => r.selected);
 }
 
 function deleteSelected() {
@@ -3569,7 +3570,8 @@ function bindEvents() {
 
   const checkAll = document.getElementById('checkAll');
   if (checkAll) checkAll.addEventListener('change', e => {
-    rows.forEach(r => r.selected = e.target.checked);
+    // 只作用于当前筛选出来的行，隐藏行不受影响
+    getFilteredRows().forEach(r => r.selected = e.target.checked);
     if (e.target.checked) lastClickedRowId = null;
     render();
   });
