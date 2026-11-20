@@ -816,6 +816,7 @@ table.hide-nonessential .col-nameplate {
           <button class="btn btn-outline" id="cmenuBtn" title="合同号：填充 / 模拟 / 清除">📄 合同号 ▾</button>
           <div class="cmenu-panel" id="cmenuPanel">
             <div class="cmenu-item" onclick="hideCMenu();triggerContractFile()">📄 填合同号（RICH定单表）</div>
+            <div class="cmenu-item" onclick="hideCMenu();openContractPaste()">📋 粘贴定单数据（加密文件用）</div>
             <div class="cmenu-item" onclick="hideCMenu();simulateContracts()">⚡ 模拟合同号（仅补空）</div>
             <div class="cmenu-sep"></div>
             <div class="cmenu-item danger" onclick="hideCMenu();clearContracts()">🗑 清除合同号</div>
@@ -947,6 +948,18 @@ table.hide-nonessential .col-nameplate {
     <div class="modal-actions">
       <button class="btn btn-outline" onclick="closeModal()">取消</button>
       <button class="btn btn-danger" id="modalConfirm">确定</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="pasteOverlay">
+  <div class="modal" style="width:600px;max-width:94vw">
+    <h3>粘贴定单数据（填合同号）</h3>
+    <p id="pasteHint" style="font-size:12px;color:#64748b;line-height:1.6;margin:0 0 10px"></p>
+    <textarea id="pasteArea" spellcheck="false" placeholder="从 Excel 选中定单表区域（含表头）复制，然后粘贴到这里…" style="width:100%;height:240px;box-sizing:border-box;padding:8px;font-size:12px;font-family:monospace;border:1px solid var(--border);border-radius:6px;resize:vertical;background:var(--card);color:var(--text)"></textarea>
+    <div class="modal-actions">
+      <button class="btn btn-outline" onclick="closePaste()">取消</button>
+      <button class="btn btn-primary" onclick="applyPasteContracts()">填充合同号</button>
     </div>
   </div>
 </div>
@@ -3938,6 +3951,8 @@ document.addEventListener('keydown', e => {
   if (e.key === 'Escape') {
     hideCtxMenu(); hideAutocomplete();
     if (document.getElementById('colFilterPanel').style.display === 'block') { closeColumnFilter(); return; }
+    const po = document.getElementById('pasteOverlay');
+    if (po && po.classList.contains('show')) { closePaste(); return; }
     const mo = document.getElementById('modalOverlay');
     const mi = document.getElementById('miniOverlay');
     if (mo && mo.classList.contains('show')) {
@@ -4368,89 +4383,151 @@ document.getElementById('importFile').addEventListener('change', function(e) {
 });
 
 // ========== Contract number fill ==========
+// 判定文件是否为加密/不可直接解析的二进制（如亿赛通 E-SafeNet 透明加密文档）
+function looksEncrypted(buf) {
+  const b = new Uint8Array(buf);
+  if (b.length < 4) return true;
+  const isZip = b[0] === 0x50 && b[1] === 0x4b;                    // PK.. xlsx
+  const isOle = b[0] === 0xd0 && b[1] === 0xcf && b[2] === 0x11 && b[3] === 0xe0; // .xls
+  if (isZip || isOle) return false;
+  // 头部含 E-SafeNet 等加密标识
+  let head = '';
+  for (let i = 0; i < Math.min(b.length, 256); i++) head += String.fromCharCode(b[i]);
+  if (/E-SafeNet|EncryptedPackage|EncryptionInfo/i.test(head)) return true;
+  // 既不是 zip/ole，也不是可打印文本（CSV）→ 视为加密/不可读
+  let printable = 0;
+  for (let i = 0; i < Math.min(b.length, 256); i++) { const c = b[i]; if (c === 9 || c === 10 || c === 13 || (c >= 32 && c < 127) || c >= 128) printable++; }
+  return printable / Math.min(b.length, 256) < 0.9;
+}
+
+// 共用：由二维数组（表头 + 数据行）填充合同号
+function fillContractsFromJson(json, sourceLabel) {
+  if (!json || json.length < 2) { showToast('定单表内容为空'); return; }
+  const headers = json[0].map(h => String(h == null ? '' : h).trim());
+  const findCol = (names) => {
+    for (let i = 0; i < headers.length; i++) {
+      for (const n of names) { if (headers[i].includes(n)) return i; }
+    }
+    return -1;
+  };
+  const colModel = findCol(['型号']);
+  const colSub = findCol(['补充型号']);
+  const colLine = findCol(['条线']);
+  const colPos = findCol(['位置']);
+  const colAttr = findCol(['属性']);
+  const colProject = findCol(['项目号']);
+  const colContract = findCol(['合同号']);
+
+  if (colModel < 0) { showToast('未找到「型号」列，请检查定单表表头'); return; }
+  if (colContract < 0) { showToast('未找到「合同号」列，请检查定单表表头'); return; }
+
+  const pool = {};
+  for (let i = 1; i < json.length; i++) {
+    const r = json[i];
+    if (!r || r.length === 0) continue;
+    const m = String(r[colModel] == null ? '' : r[colModel]).trim();
+    const sub = colSub >= 0 ? String(r[colSub] == null ? '' : r[colSub]).trim() : '';
+    const l = colLine >= 0 ? String(r[colLine] == null ? '' : r[colLine]).trim() : '';
+    const p = colPos >= 0 ? String(r[colPos] == null ? '' : r[colPos]).trim() : '';
+    const d = colAttr >= 0 ? String(r[colAttr] == null ? '' : r[colAttr]).trim() : '';
+    const proj = colProject >= 0 ? String(r[colProject] == null ? '' : r[colProject]).trim() : '';
+    const c = String(r[colContract] == null ? '' : r[colContract]).trim();
+    if (!m || !c || c === '0' || c === '-') continue;
+    const key = `${proj}|${m}|${sub}|${l}|${p}|${d}`;
+    if (!pool[key]) pool[key] = [];
+    pool[key].push(c);
+  }
+
+  if (Object.keys(pool).length === 0) { showToast('定单表中无有效数据'); return; }
+
+  pushHistory();
+  let filled = 0;
+  const usedContracts = new Set();
+  rows.forEach(r => {
+    const key = `${r.projectNo || ''}|${r.model || ''}|${r.subModel || ''}|${r.line || ''}|${r.position || ''}|${r.attr || ''}`;
+    const contracts = pool[key];
+    if (!contracts || contracts.length === 0) return;
+    for (let ci = 0; ci < contracts.length; ci++) {
+      const c = contracts[ci];
+      if (!usedContracts.has(c)) {
+        r.contractNo = c;
+        usedContracts.add(c);
+        filled++;
+        break;
+      }
+    }
+  });
+
+  render();
+  const totalContracts = Object.values(pool).reduce((s, a) => s + a.length, 0);
+  showToast('已填充 ' + filled + ' 个合同号（' + sourceLabel + '共 ' + totalContracts + ' 条记录）');
+}
+
 document.getElementById('contractFile').addEventListener('change', function(e) {
   const file = e.target.files[0];
   if (!file) return;
 
   const reader = new FileReader();
   reader.onload = function(ev) {
+    const buf = ev.target.result;
+    if (looksEncrypted(buf)) {
+      showToast('该文件为加密文档，浏览器无法直接读取，请改用「粘贴定单数据」');
+      openContractPaste();
+      return;
+    }
     try {
-      const wb = XLSX.read(ev.target.result, { type: 'array' });
+      const wb = XLSX.read(buf, { type: 'array' });
       const ws = wb.Sheets[wb.SheetNames[0]];
       const json = XLSX.utils.sheet_to_json(ws, { header: 1 });
-
-      if (json.length < 2) { showToast('定单表内容为空'); e.target.value = ''; return; }
-
-      // Find column indices by header names
-      const headers = json[0].map(h => String(h || '').trim());
-      const findCol = (names) => {
-        for (let i = 0; i < headers.length; i++) {
-          for (const n of names) { if (headers[i].includes(n)) return i; }
-        }
-        return -1;
-      };
-      const colModel = findCol(['型号']);
-      const colSub = findCol(['补充型号']);
-      const colLine = findCol(['条线']);
-      const colPos = findCol(['位置']);
-      const colAttr = findCol(['属性']);
-      const colProject = findCol(['项目号']);
-      const colContract = findCol(['合同号']);
-
-      if (colModel < 0) { showToast('未找到「型号」列，请检查定单表表头'); e.target.value = ''; return; }
-      if (colContract < 0) { showToast('未找到「合同号」列，请检查定单表表头'); e.target.value = ''; return; }
-
-      // Build contract pool: key = "projectNo|model|subModel|line|position|attr" → [contractNos]
-      const pool = {};
-      for (let i = 1; i < json.length; i++) {
-        const r = json[i];
-        if (!r || r.length === 0) continue;
-        const m = String(r[colModel] || '').trim();
-        const sub = colSub >= 0 ? String(r[colSub] || '').trim() : '';
-        const l = colLine >= 0 ? String(r[colLine] || '').trim() : '';
-        const p = colPos >= 0 ? String(r[colPos] || '').trim() : '';
-        const d = colAttr >= 0 ? String(r[colAttr] || '').trim() : '';
-        const proj = colProject >= 0 ? String(r[colProject] || '').trim() : '';
-        const c = String(r[colContract] || '').trim();
-        if (!m || !c || c === '0' || c === '-') continue;
-        const key = `${proj}|${m}|${sub}|${l}|${p}|${d}`;
-        if (!pool[key]) pool[key] = [];
-        pool[key].push(c);
-      }
-
-      if (Object.keys(pool).length === 0) { showToast('定单表中无有效数据'); e.target.value = ''; return; }
-
-      // Fill contract numbers in page order
-      pushHistory();
-      let filled = 0;
-      const usedContracts = new Set();
-      rows.forEach(r => {
-        const key = `${r.projectNo || ''}|${r.model || ''}|${r.subModel || ''}|${r.line || ''}|${r.position || ''}|${r.attr || ''}`;
-        const contracts = pool[key];
-        if (!contracts || contracts.length === 0) return;
-        // Take first unused contract
-        for (let ci = 0; ci < contracts.length; ci++) {
-          const c = contracts[ci];
-          if (!usedContracts.has(c)) {
-            r.contractNo = c;
-            usedContracts.add(c);
-            filled++;
-            break;
-          }
-        }
-      });
-
-      render();
-      const totalContracts = Object.values(pool).reduce((s, a) => s + a.length, 0);
-      showToast('已填充 ' + filled + ' 个合同号（定单表共 ' + totalContracts + ' 条记录）');
+      fillContractsFromJson(json, '定单表');
     } catch(err) {
       console.error(err);
-      showToast('读取失败: ' + err.message);
+      showToast('读取失败: ' + err.message + '（若为加密文档，请改用「粘贴定单数据」）');
     }
   };
   reader.readAsArrayBuffer(file);
   e.target.value = '';
 });
+
+// ========== Paste contract data from encrypted/any spreadsheet ==========
+function openContractPaste() {
+  const hint = document.getElementById('pasteHint');
+  if (hint) hint.textContent = '加密文档浏览器无法直接解密。请用 Excel/WPS 打开定单表（会自动解密），选中含表头的数据区域复制后粘贴到下方。支持 Tab 分隔（Excel 直接复制）或逗号分隔。';
+  const area = document.getElementById('pasteArea');
+  if (area) { area.value = ''; }
+  document.getElementById('pasteOverlay').classList.add('show');
+  setTimeout(() => { const a = document.getElementById('pasteArea'); if (a) a.focus(); }, 0);
+}
+function closePaste() {
+  document.getElementById('pasteOverlay').classList.remove('show');
+}
+// 解析粘贴文本：自动识别 Tab / 逗号分隔，处理双引号包裹与转义
+function parsePastedTable(text) {
+  const lines = String(text || '').replace(/\r\n?/g, '\n').split('\n').filter(l => l.trim() !== '');
+  if (!lines.length) return [];
+  const delim = (lines[0].indexOf('\t') >= 0) ? '\t' : (lines[0].indexOf(',') >= 0 ? ',' : '\t');
+  const parseLine = (line) => {
+    const out = []; let cur = ''; let inQ = false;
+    for (let i = 0; i < line.length; i++) {
+      const ch = line[i];
+      if (ch === '"') {
+        if (inQ && line[i + 1] === '"') { cur += '"'; i++; }
+        else inQ = !inQ;
+      } else if (ch === delim && !inQ) { out.push(cur); cur = ''; }
+      else cur += ch;
+    }
+    out.push(cur);
+    return out.map(x => x.trim());
+  };
+  return lines.map(parseLine);
+}
+function applyPasteContracts() {
+  const area = document.getElementById('pasteArea');
+  const json = parsePastedTable(area ? area.value : '');
+  if (!json.length) { showToast('请先粘贴定单表数据'); return; }
+  closePaste();
+  fillContractsFromJson(json, '粘贴数据');
+}
 
 // ========== Simulate contract numbers (fill empty only) ==========
 // 特殊标识 → 英文代码（规则见需求：出口F/医药Y/防爆EX/有毒D/精细化工-EC，电控硬件-EE/上位机-SE 以 "-" 连接）
