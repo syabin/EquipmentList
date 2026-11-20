@@ -4255,7 +4255,7 @@ function addBorders(ws) {
 // 导出前需要检查空值的列（截图中标出的关键列）
 const EXPORT_CHECK_FIELDS = [
   ['position','位置'], ['contractAttr','合同属性'], ['biz','业务归属'],
-  ['dept','责任部门'], ['paint','油漆'], ['nameplate','铭牌'], ['line','条线']
+  ['dept','责任部门'], ['paint','油漆'], ['nameplate','铭牌'], ['line','条线'], ['process','工序']
 ];
 // 返回 [{label, count, sample}] —— 仅列出存在空值的列
 function findExportEmpties(){
@@ -4487,7 +4487,9 @@ function fillContractsFromJson(json, sourceLabel) {
   const colPos = findCol(['位置']);
   const colAttr = findCol(['属性']);
   const colProject = findCol(['项目号']);
+  const colProcess = findCol(['工序']);
   const colContract = findCol(['合同号']);
+  const useProcess = colProcess >= 0; // 定单表含「工序」列时才纳入匹配，兼容旧表
 
   if (colModel < 0) { showToast('未找到「型号」列，请检查定单表表头'); return; }
   if (colContract < 0) { showToast('未找到「合同号」列，请检查定单表表头'); return; }
@@ -4502,9 +4504,10 @@ function fillContractsFromJson(json, sourceLabel) {
     const p = colPos >= 0 ? String(r[colPos] == null ? '' : r[colPos]).trim() : '';
     const d = colAttr >= 0 ? String(r[colAttr] == null ? '' : r[colAttr]).trim() : '';
     const proj = colProject >= 0 ? String(r[colProject] == null ? '' : r[colProject]).trim() : '';
+    const proc = useProcess ? String(r[colProcess] == null ? '' : r[colProcess]).trim() : '';
     const c = String(r[colContract] == null ? '' : r[colContract]).trim();
     if (!m || !c || c === '0' || c === '-') continue;
-    const key = `${proj}|${m}|${sub}|${l}|${p}|${d}`;
+    const key = `${proj}|${m}|${sub}|${l}|${p}|${d}|${proc}`;
     if (!pool[key]) pool[key] = [];
     pool[key].push(c);
   }
@@ -4515,7 +4518,7 @@ function fillContractsFromJson(json, sourceLabel) {
   let filled = 0;
   const usedContracts = new Set();
   rows.forEach(r => {
-    const key = `${r.projectNo || ''}|${r.model || ''}|${r.subModel || ''}|${r.line || ''}|${r.position || ''}|${r.attr || ''}`;
+    const key = `${r.projectNo || ''}|${r.model || ''}|${r.subModel || ''}|${r.line || ''}|${r.position || ''}|${r.attr || ''}|${useProcess ? (r.process || '') : ''}`;
     const contracts = pool[key];
     if (!contracts || contracts.length === 0) return;
     for (let ci = 0; ci < contracts.length; ci++) {
