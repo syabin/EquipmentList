@@ -1006,7 +1006,7 @@ table.hide-nonessential .col-nameplate {
         <input type="text" id="archiveNote" placeholder="备注（可选）" maxlength="120" autocomplete="off">
         <button class="btn btn-primary" onclick="saveArchive()">保存</button>
       </div>
-      <div class="archive-hint">点存档名称或项目文件夹上的「🏷 填入」，可把对应项目号带进本输入框 · 按项目号分文件夹（同一存档含多个项目号会出现在多个文件夹，点击文件夹标题可折叠）· 回车保存 · Esc 关闭 · 同名询问覆盖/另存 · 加载前自动留快照，删除可撤回 · 勾选可批量导出/删除</div>
+      <div class="archive-hint">点存档名称或项目文件夹上的「🏷 填入」，可把对应项目号带进本输入框 · 按项目号分文件夹（同一存档含多个项目号会出现在多个文件夹，点击文件夹标题可折叠）· 回车保存 · Esc 关闭 · 保存时可选覆盖任意存档 · 加载前自动留快照，删除可撤回 · 勾选可批量导出/删除</div>
     </div>
   </div>
 </div>
@@ -1448,16 +1448,49 @@ function saveArchive(){
   const name = (nameInput.value || '').trim();
   if (!name) { showToast('请输入项目名称'); nameInput.focus(); return; }
   const note = (noteInput.value || '').trim();
-  const same = getArchives().find(a => a.name === name && a.kind !== 'auto');
+  const all = getArchives().filter(a => a.kind !== 'auto');
+  const same = all.find(a => a.name === name);
+  const options = [];
   if (same) {
-    showChoiceModal('同名存档已存在', '已有名为「' + name + '」的存档（' + same.timeStr + '）。请选择处理方式：', [
-      { label:'覆盖更新', cls:'btn-primary', onClick: () => doSaveArchive(name, note, same.id) },
-      { label:'另存为新存档', cls:'btn-outline', onClick: () => doSaveArchive(name + ' (2)', note) },
-      { label:'取消', cls:'btn-outline', onClick: () => {} }
-    ]);
-    return;
+    options.push({ label:'覆盖「' + same.name + '」', cls:'btn-primary', onClick: () => doSaveArchive(name, note, same.id) });
   }
-  doSaveArchive(name, note);
+  if (all.length) {
+    options.push({ label:'选择要覆盖的存档…', cls:'btn-outline', onClick: () => showOverwritePicker(name, note) });
+  }
+  options.push({ label:'另存为新存档', cls:same ? 'btn-outline' : 'btn-primary', onClick: () => doSaveArchive(same ? name + ' (2)' : name, note) });
+  options.push({ label:'取消', cls:'btn-outline', onClick: () => {} });
+  showChoiceModal(same ? '同名存档已存在' : '保存存档',
+    (same ? '已有名为「' + name + '」的存档（' + same.timeStr + '）。\n' : '') + '请选择保存方式：', options);
+}
+
+// 选择要覆盖的存档（列出全部手动存档，含名称/备注/时间/行数）
+function showOverwritePicker(name, note){
+  const all = getArchives().filter(a => a.kind !== 'auto');
+  if (!all.length) { showToast('暂无可覆盖的存档'); return; }
+  let html = '<p style="font-size:12px;color:#64748b;margin:0 0 10px">选择要用当前 ' + rows.length + ' 行数据覆盖的存档：</p>';
+  html += '<div style="max-height:320px;overflow:auto;border:1px solid var(--border);border-radius:6px">';
+  all.forEach(a => {
+    html += '<button type="button" class="ov-option" data-id="' + escAttr(a.id) + '" style="display:block;width:100%;text-align:left;padding:9px 12px;border:none;border-bottom:1px solid var(--border);background:transparent;color:var(--text);cursor:pointer">'
+      + '<div style="font-weight:600">' + escHtml(a.name) + '</div>'
+      + '<div style="font-size:11px;color:#94a3b8">' + escHtml(a.timeStr || '') + ' · ' + (a.rows ? a.rows.length : 0) + ' 行' + (a.note ? ' · ' + escHtml(a.note) : '') + '</div>'
+      + '</button>';
+  });
+  html += '</div>';
+  openMiniModal('选择要覆盖的存档', html, [{ label:'取消', cls:'btn-outline' }], '480px');
+  document.querySelectorAll('#miniBody .ov-option').forEach(btn => {
+    btn.addEventListener('mouseenter', () => { btn.style.background = 'rgba(59,130,246,0.08)'; });
+    btn.addEventListener('mouseleave', () => { btn.style.background = 'transparent'; });
+    btn.onclick = () => {
+      const id = btn.dataset.id;
+      const target = getArchives().find(a => a.id === id);
+      closeMiniModal();
+      if (!target) { showToast('该存档已不存在'); return; }
+      showModal('确认覆盖存档', '确定用当前 ' + rows.length + ' 行数据覆盖「' + target.name + '」吗？覆盖前会自动留一份快照，可随时回退。', () => {
+        createAutoSnapshot('覆盖存档「' + target.name + '」前', true);
+        doSaveArchive(name, note, target.id);
+      }, null, '确认覆盖');
+    };
+  });
 }
 function doSaveArchive(name, note, overwriteId){
   const archives = getArchives();
@@ -4219,9 +4252,44 @@ function addBorders(ws) {
 }
 
 // ========== Export ==========
+// 导出前需要检查空值的列（截图中标出的关键列）
+const EXPORT_CHECK_FIELDS = [
+  ['position','位置'], ['contractAttr','合同属性'], ['biz','业务归属'],
+  ['dept','责任部门'], ['paint','油漆'], ['nameplate','铭牌'], ['line','条线']
+];
+// 返回 [{label, count, sample}] —— 仅列出存在空值的列
+function findExportEmpties(){
+  const missing = [];
+  EXPORT_CHECK_FIELDS.forEach(([f, label]) => {
+    const emptyRows = [];
+    rows.forEach((r, i) => {
+      const v = r[f] == null ? '' : String(r[f]).trim();
+      if (!v) emptyRows.push(i + 1);
+    });
+    if (emptyRows.length) missing.push({ label, count: emptyRows.length, sample: emptyRows.slice(0, 8) });
+  });
+  return missing;
+}
+// 有空值则先弹确认；确认后执行 proceed
+function guardExportEmpty(proceed){
+  const missing = findExportEmpties();
+  if (!missing.length) { proceed(); return; }
+  let msg = '以下列存在空值，建议补全后再导出：\n\n';
+  missing.forEach(m => {
+    msg += `• ${m.label}：${m.count} 行为空（第 ${m.sample.join('、')}${m.count > m.sample.length ? ' …' : ''} 行）\n`;
+  });
+  showChoiceModal('导出前检查', msg, [
+    { label:'仍然导出', cls:'btn-warning', onClick: proceed },
+    { label:'返回补全', cls:'btn-outline', onClick: () => {} }
+  ]);
+}
+
 function saveExcel() {
   if (rows.length === 0) { showToast('没有数据可保存'); return; }
+  guardExportEmpty(() => doSaveExcel());
+}
 
+function doSaveExcel() {
   const headers = ['序号','年份','项目号','虚拟码','合同号','设备名称','型号','补充型号','属性','撬块归属','工序','设计备注','数量','是否整机外购','位置','合同属性','业务归属','责任部门','油漆','铭牌','条线','主设备','配套标识','特殊标记'];
   const fields = ['year','projectNo','virtualCode','contractNo','equipName','model','subModel','attr','blockOwner','process','designNote','qty','purchase','position','contractAttr','biz','dept','paint','nameplate','line','mainEquip','matchMark','specialMark'];
 
@@ -4261,7 +4329,10 @@ function saveExcel() {
 // ========== Export (no timer) ==========
 function exportExcel() {
   if (rows.length === 0) { showToast('没有数据可导出'); return; }
+  guardExportEmpty(() => doExportExcel());
+}
 
+function doExportExcel() {
   const headers = ['序号','年份','项目号','虚拟码','合同号','设备名称','型号','补充型号','属性','撬块归属','工序','设计备注','数量','是否整机外购','位置','合同属性','业务归属','责任部门','油漆','铭牌','条线','主设备','配套标识','特殊标记'];
   const fields = ['year','projectNo','virtualCode','contractNo','equipName','model','subModel','attr','blockOwner','process','designNote','qty','purchase','position','contractAttr','biz','dept','paint','nameplate','line','mainEquip','matchMark','specialMark'];
 
